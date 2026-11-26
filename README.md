@@ -67,7 +67,7 @@ The attribute is a list (or a JSON string of one) of:
 | `icon_entity` | Optional entity whose HA icon the row shows (e.g. a gate's cover rather than its position sensor). |
 | `since` | A timestamp shown as "since 11:00 pm" (today) or "since 25 Nov". Falls back to when `entity_id` last changed; `null` shows no time. |
 | `entity_id` | Optional; used for the fallbacks above and as the default action target. |
-| `action` | Optional row button: `{ service: domain.service, target?, data? }`, i.e. what to do. How it looks comes from the pop-up's `actions` setting. Tapping calls the service, then the button shows its busy label, disabled. It comes back after a minute if the row is still listed; normally the helper drops the row once the action has worked. |
+| `action` | Optional row button: `{ service: domain.service, target?, data?, style? }`, i.e. what to do; `style` picks which `actions` entry it looks like (default: the service). How it looks comes from the pop-up's `actions` setting. Tapping calls the service, then the button shows its busy label, disabled. It comes back after a minute if the row is still listed; normally the helper drops the row once the action has worked. |
 | `camera` / `cameras` | Optional camera entity, or a list of entities or `{ entity, title }`. The row then shows a chevron that expands the feeds (one `camera_card` each, two side by side) with the `action` button under them, so you look before acting. Only one row is expanded at a time. |
 | `key` | Optional stable id for the row (default `entity_id`, then `name`). |
 

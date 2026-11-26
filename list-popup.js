@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.11.2";
+const VERSION = "0.12.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -111,8 +111,11 @@ class ListPopup extends HTMLElement {
     const a = item.action;
     const service = a && (a.service || a.action);
     if (!service) return "";
-    const look = { ...((this._cfg.actions || {})[service] || {}), ...a };
-    const sentAt = this._sent[`${key}|${service}`];
+    // `style` (optional) names the `actions` entry to look like, e.g. "stop" for
+    // a pulse that stops a moving door; it defaults to the service.
+    const styleKey = a.style || service;
+    const look = { ...((this._cfg.actions || {})[styleKey] || {}), ...a };
+    const sentAt = this._sent[`${key}|${styleKey}`];
     const sent = sentAt && Date.now() - sentAt < 60000;
     // `disabled_by: { field, labels }`: greyed out while the item's field is set
     // (e.g. `moving`), labelled by its value ("Opening…" / "Closing…").
@@ -301,7 +304,7 @@ class ListPopup extends HTMLElement {
     if (!domain || !service) return;
     // Remember per row AND service, so a new action (e.g. Stop while a gate
     // closes) is live straight away rather than greyed out by the last one.
-    this._sent[`${key}|${svc}`] = Date.now();
+    this._sent[`${key}|${a.style || svc}`] = Date.now();
     hass.callService(domain, service, a.data || {}, a.target || (item.entity_id ? { entity_id: item.entity_id } : undefined));
     this._sig = null;
     this._render();
