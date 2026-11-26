@@ -106,7 +106,7 @@ with `secondary: [area, sensors]` in the pop-up config, the row reads
 ## Styling
 
 The pop-up uses `--ha-dialog-surface-background`, so it matches HA's own
-dialogs. Override it with `--list-popup-background`, `--list-popup-border`
-and `--list-popup-backdrop` (no blur by default: it's hard on tablet GPUs).
+dialogs. Override it with `--list-popup-background`, `--list-popup-border`,
+`--list-popup-shadow` and `--list-popup-backdrop` (no blur by default: it's hard on tablet GPUs).
 A pop-up opened from an anchor takes these, and the theme colours it draws
 with, from where it was opened, so a view's own theme reaches it.

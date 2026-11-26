@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.18.0";
+const VERSION = "0.18.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -36,7 +36,7 @@ function currentHass() {
 
 // Theme variables the pop-up draws with, carried over from where it was opened.
 const THEME_VARS = [
-  "--list-popup-background", "--list-popup-border", "--list-popup-backdrop",
+  "--list-popup-background", "--list-popup-border", "--list-popup-backdrop", "--list-popup-shadow",
   "--ha-dialog-surface-background", "--mdc-theme-surface", "--ha-card-border-color", "--divider-color",
   "--primary-text-color", "--secondary-text-color", "--ha-font-family-body",
   "--state-light-active-color", "--amber-color",
@@ -636,7 +636,7 @@ const STYLE = `
   /* The same surface as HA's own dialogs. */
   background: var(--list-popup-background, var(--ha-dialog-surface-background, var(--mdc-theme-surface, #1c1d21)));
   border: 1px solid var(--list-popup-border, var(--ha-card-border-color, var(--divider-color)));
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--list-popup-shadow, 0 8px 32px rgba(0, 0, 0, 0.45));
   -webkit-backdrop-filter: var(--list-popup-backdrop, none);
   backdrop-filter: var(--list-popup-backdrop, none);
 }
