@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.12.1";
+const VERSION = "0.13.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -40,6 +40,8 @@ class ListPopup extends HTMLElement {
     this._sig = null;
     this._expanded = null; // key of the row whose camera is showing
     this._sent = {}; // key -> time its action was sent
+    this._presses = {}; // key -> presses of its current action (for `cycle`)
+    this._lastStyle = {}; // row key -> the action style it last showed
     this._hadItems = false;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this._key = (ev) => {
@@ -115,6 +117,24 @@ class ListPopup extends HTMLElement {
     // a pulse that stops a moving door; it defaults to the service.
     const styleKey = a.style || service;
     const look = { ...((this._cfg.actions || {})[styleKey] || {}), ...a };
+    // A new style for this row (e.g. Close → Stop) starts its count afresh.
+    if (this._lastStyle[key] !== styleKey) {
+      this._lastStyle[key] = styleKey;
+      delete this._presses[`${key}|${styleKey}`];
+      delete this._sent[`${key}|${styleKey}`];
+    }
+    // `cycle: [{ label, icon?, colour? }, …]`: the button stays live and its
+    // look steps through the list with each press (e.g. Stop → Resume → Stop),
+    // for actions where every press does the same thing (a door's pulse).
+    if (Array.isArray(look.cycle) && look.cycle.length) {
+      const n = (this._presses[`${key}|${styleKey}`] || 0) % look.cycle.length;
+      const step = { ...look, ...look.cycle[n] };
+      const c = colourOf(step.colour || "quiet");
+      const txt = String(step.label || "Go").replace(/\{name\}/g, item.name || "");
+      const ico = step.icon ? `<ha-icon icon="${esc(step.icon)}"></ha-icon>` : "";
+      return `<button class="btn${wide ? " wide" : ""}" data-act="${esc(key)}"
+        style="background:${esc(c.bg)};color:${esc(c.fg)}">${ico}<span>${esc(txt)}</span></button>`;
+    }
     const sentAt = this._sent[`${key}|${styleKey}`];
     const sent = sentAt && Date.now() - sentAt < 60000;
     // `disabled_by: { field, labels }`: greyed out while the item's field is set
@@ -304,7 +324,9 @@ class ListPopup extends HTMLElement {
     if (!domain || !service) return;
     // Remember per row AND service, so a new action (e.g. Stop while a gate
     // closes) is live straight away rather than greyed out by the last one.
-    this._sent[`${key}|${a.style || svc}`] = Date.now();
+    const styleKey = a.style || svc;
+    this._sent[`${key}|${styleKey}`] = Date.now();
+    this._presses[`${key}|${styleKey}`] = (this._presses[`${key}|${styleKey}`] || 0) + 1;
     hass.callService(domain, service, a.data || {}, a.target || (item.entity_id ? { entity_id: item.entity_id } : undefined));
     this._sig = null;
     this._render();
