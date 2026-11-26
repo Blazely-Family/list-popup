@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.14.0";
+const VERSION = "0.15.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -365,6 +365,9 @@ class ListPopup extends HTMLElement {
     const tint = c.icon_colour || colour.bg;
     const icon = c.icon || "mdi:format-list-bulleted";
     const count = c.noun ? `${n} ${esc(c.noun)}${n === 1 ? "" : "s"}` : `${n}`;
+    // As HA's own expansion panels: when any row expands, every row keeps the
+    // chevron's slot, so the times line up down the list.
+    const anyCams = items.some((i) => this._camList(i).length > 0);
     const rowOf = (i, groupColour) => {
         const key = this._keyOf(i);
         // A row in a coloured section takes that colour for its icon tint.
@@ -387,8 +390,8 @@ class ListPopup extends HTMLElement {
         const open = cams.length > 0 && this._expanded === key;
         // A row with a camera expands (chevron); its action sits under the feed, so you look first.
         const right = cams.length
-          ? `<ha-icon class="chev" icon="${open ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`
-          : this._actionButton(i, key, false);
+          ? `<ha-icon class="chev${open ? " up" : ""}" icon="mdi:chevron-down"></ha-icon>`
+          : this._actionButton(i, key, false) || (anyCams ? `<span class="chev slot"></span>` : "");
         const head = `<div class="row${open ? " open" : ""}${cams.length ? " tap" : ""}"${cams.length ? ` data-view="${esc(key)}"` : ""}${tintStyle}><div class="icon">${rowIcon}</div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
         const feeds = cams.map((cam) => this._feed(hass, cam.entity)).join("");
@@ -530,7 +533,10 @@ ha-icon { display: flex; line-height: 0; }
 .feeds.two { grid-template-columns: 1fr 1fr; }
 .feeds > *, ::slotted(*) { display: block; min-width: 0; }
 .cell { min-width: 0; }
-.chev { flex: none; cursor: pointer; padding: 4px; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 24px; }
+.chev { flex: none; width: 24px; height: 24px; cursor: pointer; padding: 4px; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 24px;
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+.chev.up { transform: rotate(180deg); }
+.chev.slot { cursor: default; }
 .group { padding: 10px 20px 2px; font-size: 12px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--secondary-text-color, #a3a7b0); }
 .empty { padding: 16px 20px; color: var(--secondary-text-color, #a3a7b0); }
 `;
