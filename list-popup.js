@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.17.1";
+const VERSION = "0.17.2";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -309,7 +309,10 @@ class ListPopup extends HTMLElement {
     const r = a.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight, gap = 8, edge = 16;
     const w = Math.min(560, vw - 2 * edge);
-    const left = Math.min(Math.max(r.right - w, edge), vw - edge - w);
+    // Edges lined up on the anchor's own side: a left-hand anchor shares its
+    // left edge with the panel, a right-hand one its right edge.
+    const leftSide = r.left + r.width / 2 < vw / 2;
+    const left = Math.min(Math.max(leftSide ? r.left : r.right - w, edge), vw - edge - w);
     const below = vh - r.bottom - gap - edge, above = r.top - gap - edge;
     const down = below >= 320 || below >= above;
     this._maxH = Math.max(120, down ? below : above);
