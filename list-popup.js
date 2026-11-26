@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.17.0";
+const VERSION = "0.17.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -38,6 +38,10 @@ class ListPopup extends HTMLElement {
   open(cfg, anchor) {
     this._cfg = cfg || {};
     this._anchor = anchor && anchor.isConnected ? anchor : null;
+    // Cards redraw themselves, replacing the anchor element; remember where it
+    // lives and its id (the attribute's value) to find its replacement.
+    this._anchorRoot = this._anchor && this._anchor.getRootNode();
+    this._anchorId = this._anchor && this._anchor.getAttribute("data-popup-anchor");
     this._sig = null;
     this._expanded = null; // key of the row whose camera is showing
     this._sent = {}; // key -> time its action was sent
@@ -294,12 +298,14 @@ class ListPopup extends HTMLElement {
   // and the anchor stays lit through a hole in the dimmed backdrop, so the
   // panel reads as belonging to it. Above it instead if there's more room there.
   _place() {
-    const a = this._anchor;
-    if (!a || !a.isConnected) {
-      this.classList.remove("anchored");
-      this._maxH = null;
-      return;
+    let a = this._anchor;
+    if (a && !a.isConnected && this._anchorRoot) {
+      const id = this._anchorId;
+      a = this._anchor = [...this._anchorRoot.querySelectorAll("[data-popup-anchor]")]
+        .find((el) => el.getAttribute("data-popup-anchor") === id) || a;
     }
+    // Anchor gone for now (mid-redraw, or hidden): stay where we are.
+    if (!a || !a.isConnected) return;
     const r = a.getBoundingClientRect();
     const vw = window.innerWidth, vh = window.innerHeight, gap = 8, edge = 16;
     const w = Math.min(560, vw - 2 * edge);
