@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.5.1";
+const VERSION = "0.6.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -105,13 +105,60 @@ class ListPopup extends HTMLElement {
       style="background:${esc(col.bg)};color:${esc(col.fg)}">${ic}<span>${esc(label)}</span></button>`;
   }
 
+  // The camera card for one camera: the pop-up's `camera_card` config with every
+  // "$camera" / "$title" string replaced, built by HA's own card helpers, so it
+  // looks and behaves exactly like that card does elsewhere on the dashboard.
+  async _cameraCard(cam, title) {
+    const fill = (v) =>
+      typeof v === "string"
+        ? v.replace(/\$camera/g, cam).replace(/\$title/g, title)
+        : Array.isArray(v)
+          ? v.map(fill)
+          : v && typeof v === "object"
+            ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x)]))
+            : v;
+    const helpers = await window.loadCardHelpers();
+    const el = helpers.createCardElement(fill(this._cfg.camera_card));
+    el.hass = currentHass();
+    return el;
+  }
+
+  _camList(item) {
+    return [].concat(item.cameras || item.camera || []).filter(Boolean)
+      .map((c) => (typeof c === "string" ? { entity: c } : c));
+  }
+
+  // Keep the expanded row's camera cards alive across redraws (rebuilding them
+  // would restart the streams): build once per expansion, then move them in.
+  _placeCards(hass, item, key) {
+    if (!this._cfg.camera_card) return;
+    if (this._cardsKey !== key) {
+      this._cardsKey = key;
+      this._cards = Promise.all(
+        this._camList(item).map((c) => {
+          const st = hass.states[c.entity];
+          return this._cameraCard(c.entity, c.title || (st && st.attributes.friendly_name) || c.entity);
+        })
+      );
+    }
+    this._cards.then((els) => {
+      if (this._cardsKey !== key) return;
+      const slot = this.shadowRoot.querySelector(".feeds");
+      if (!slot) return;
+      els.forEach((el) => {
+        el.hass = currentHass();
+        if (el.parentNode !== slot) slot.appendChild(el);
+      });
+    });
+  }
+
+  // Without a `camera_card`, a plain HA MJPEG proxy image.
   _feed(hass, cam) {
+    if (this._cfg.camera_card) return "";
     const st = hass.states[cam];
     const token = st && st.attributes.access_token;
-    const label = (st && st.attributes.friendly_name) || cam;
     if (!token) return `<div class="feed off">Camera unavailable</div>`;
-    // HA's own MJPEG proxy: works anywhere an <img> does, no extra card needed.
-    return `<div class="feed"><img src="/api/camera_proxy_stream/${esc(cam)}?token=${esc(token)}" alt=""><span class="live">LIVE</span><span class="cam">${esc(label)}</span></div>`;
+    return `<div class="feed"><img src="/api/camera_proxy_stream/${esc(cam)}?token=${esc(token)}" alt=""></div>`;
   }
 
   _run(item, key) {
@@ -155,7 +202,7 @@ class ListPopup extends HTMLElement {
         const name = i.name || (st && st.attributes.friendly_name) || i.entity_id;
         const sec = i.secondary ? `<div class="sec">${esc(i.secondary)}</div>` : "";
         // `cameras` (or one `camera`): shown side by side when the row is expanded.
-        const cams = [].concat(i.cameras || i.camera || []).filter(Boolean);
+        const cams = this._camList(i);
         const open = cams.length > 0 && this._expanded === key;
         // A row with a camera shows View; its action sits under the feed, so you look first.
         const right = cams.length
@@ -163,7 +210,7 @@ class ListPopup extends HTMLElement {
           : this._actionButton(i, key, false);
         const head = `<div class="row${open ? " open" : ""}"><div class="icon"><ha-icon icon="${esc(ri)}"></ha-icon></div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
-        const feeds = cams.map((cam) => this._feed(hass, cam)).join("");
+        const feeds = cams.map((cam) => this._feed(hass, cam.entity)).join("");
         return `${head}<div class="expand"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}</div>${this._actionButton(i, key, true)}</div>`;
       })
       .join("");
@@ -181,10 +228,18 @@ class ListPopup extends HTMLElement {
         <div class="divider"></div>
         <div class="list">${body}</div>
       </div>`;
+    // Camera cards: drop them when their row closes; keep them current while open.
+    if (this._cardsKey && this._cardsKey !== this._expanded) {
+      this._cardsKey = null;
+      this._cards = null;
+    }
+    if (this._cards) this._cards.then((els) => els.forEach((el) => (el.hass = hass)));
     if (html === this._sig) return;
     this._sig = html;
     this._shown = items;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${html}`;
+    const openItem = this._expanded && items.find((i) => this._keyOf(i) === this._expanded);
+    if (openItem) this._placeCards(hass, openItem, this._expanded);
     this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());
     this.shadowRoot.querySelector(".close").addEventListener("click", () => this.close());
     this.shadowRoot.querySelectorAll("[data-view]").forEach((b) =>
@@ -259,12 +314,9 @@ ha-icon { display: flex; line-height: 0; }
 .feed { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; background: #111; }
 .feed img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .feed.off { display: flex; align-items: center; justify-content: center; color: var(--secondary-text-color, #a3a7b0); }
-.live { position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
-  padding: 2px 6px; border-radius: 6px; background: #db4437; color: #fff; }
 .feeds { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .feeds.two { grid-template-columns: 1fr 1fr; }
-.cam { position: absolute; bottom: 6px; left: 8px; right: 8px; font-size: 12px; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feeds > * { display: block; min-width: 0; }
 .empty { padding: 16px 20px; color: var(--secondary-text-color, #a3a7b0); }
 `;
 
