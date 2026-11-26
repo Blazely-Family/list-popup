@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.15.0";
+const VERSION = "0.15.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -258,6 +258,32 @@ class ListPopup extends HTMLElement {
     requestAnimationFrame(fit);
   }
 
+  // Slide an expanded row's body open or shut. The panel's own height
+  // transition is paused meanwhile, so the panel follows the rows frame by
+  // frame and everything below the row moves with it.
+  _slide(el, opening, done) {
+    const dlg = this.shadowRoot.querySelector(".dialog");
+    this._sliding = true;
+    if (dlg) dlg.style.transition = "none";
+    const full = el.scrollHeight;
+    Object.assign(el.style, { boxSizing: "border-box", overflow: "hidden", transition: "none",
+      height: opening ? "0px" : `${full}px`, paddingBottom: opening ? "0px" : "", opacity: opening ? "0" : "1" });
+    void el.offsetHeight;
+    Object.assign(el.style, { transition: "height 260ms ease, padding-bottom 260ms ease, opacity 200ms ease",
+      height: opening ? `${full}px` : "0px", paddingBottom: opening ? "" : "0px", opacity: opening ? "1" : "0" });
+    let ended = false;
+    const end = () => {
+      if (ended) return;
+      ended = true;
+      this._sliding = false;
+      if (dlg) dlg.style.transition = "";
+      if (done) return done();
+      Object.assign(el.style, { boxSizing: "", overflow: "", transition: "", height: "", paddingBottom: "", opacity: "" });
+    };
+    el.addEventListener("transitionend", (ev) => { if (ev.target === el && ev.propertyName === "height") end(); });
+    setTimeout(end, 320);
+  }
+
   _dropCards() {
     this._cardsKey = null;
     this._cards = null;
@@ -446,17 +472,27 @@ class ListPopup extends HTMLElement {
     const openItem = this._expanded && items.find((i) => this._keyOf(i) === this._expanded);
     if (openItem) this._placeCards(hass, openItem, this._expanded);
     this._watchSize();
+    // A row just opened: slide its cameras open rather than snapping them in.
+    const growing = this._grow && this.shadowRoot.querySelector(".expand.grow");
+    this._grow = null;
+    if (growing) this._slide(growing, true);
     this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());
     this.shadowRoot.querySelector(".close").addEventListener("click", () => this.close());
     // The whole row (not just its chevron) opens and closes its cameras.
     this.shadowRoot.querySelectorAll("[data-view]").forEach((b) =>
       b.addEventListener("click", () => {
-        this._expanded = this._expanded === b.dataset.view ? null : b.dataset.view;
-        this._grow = this._expanded; // animate this row's opening once
-        clearTimeout(this._growTimer);
-        this._growTimer = setTimeout(() => (this._grow = null), 400);
-        this._sig = null;
-        this._render();
+        if (this._sliding) return;
+        const next = this._expanded === b.dataset.view ? null : b.dataset.view;
+        const go = () => {
+          this._expanded = next;
+          this._grow = next; // slide this row open once it is drawn
+          this._sig = null;
+          this._render();
+        };
+        // The open row (if any) slides shut first, so the rows below move with it.
+        const open = this.shadowRoot.querySelector(".expand");
+        if (open) this._slide(open, false, go);
+        else go();
       })
     );
     this.shadowRoot.querySelectorAll("[data-act]").forEach((b) =>
@@ -532,7 +568,8 @@ ha-icon { display: flex; line-height: 0; }
 .feeds { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .feeds.two { grid-template-columns: 1fr 1fr; }
 .feeds > *, ::slotted(*) { display: block; min-width: 0; }
-.cell { min-width: 0; }
+/* Holds a camera card's 16:9 space before it has drawn, so a row slides open to its full height. */
+.cell { min-width: 0; aspect-ratio: 16 / 9; }
 .chev { flex: none; width: 24px; height: 24px; cursor: pointer; padding: 4px; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 24px;
   transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1); }
 .chev.up { transform: rotate(180deg); }
