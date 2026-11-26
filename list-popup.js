@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.19.0";
+const VERSION = "0.19.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -644,14 +644,15 @@ const STYLE = `
   backdrop-filter: var(--list-popup-backdrop, none);
 }
 ha-icon { display: flex; line-height: 0; }
-.head { display: flex; align-items: center; gap: 12px; padding: 0 20px 12px; }
-.lead { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); --mdc-icon-size: 18px; }
-.title { flex: 1 1 auto; font-size: 20px; font-weight: 500; }
-.sub { font-size: 13px; font-weight: 400; color: var(--secondary-text-color, #a3a7b0); }
-.link { flex: none; font-size: 14px; font-weight: 500; text-decoration: none; padding: 6px 10px; border-radius: 8px;
+/* The header chip is the rows' icon size and sits in the same column. */
+.head { display: flex; align-items: center; gap: 14px; padding: 0 20px 12px; }
+.lead { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); --mdc-icon-size: 22px; }
+.title { flex: 1 1 auto; font-size: 22px; font-weight: 500; }
+.sub { font-size: 16px; font-weight: 400; color: var(--secondary-text-color, #a3a7b0); }
+.link { flex: none; font-size: 15px; font-weight: 500; text-decoration: none; padding: 6px 10px; border-radius: 8px;
   color: var(--primary-text-color, #eaebee); background: rgba(158, 158, 158, 0.25); }
-.close { cursor: pointer; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 22px; padding: 4px; }
+.close { cursor: pointer; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 26px; padding: 4px; }
 .divider { height: 1px; background: var(--divider-color, rgba(255, 255, 255, 0.08)); margin: 0 20px; }
 .list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 0; scrollbar-width: none; }
 /* No visible scrollbar: one appearing while the panel grows would shift the rows left. */
