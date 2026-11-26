@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.12.0";
+const VERSION = "0.12.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -466,7 +466,9 @@ ha-icon { display: flex; line-height: 0; }
   color: var(--primary-text-color, #eaebee); background: rgba(158, 158, 158, 0.25); }
 .close { cursor: pointer; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 22px; padding: 4px; }
 .divider { height: 1px; background: var(--divider-color, rgba(255, 255, 255, 0.08)); margin: 0 20px; }
-.list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 0; }
+.list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 0; scrollbar-width: none; }
+/* No visible scrollbar: one appearing while the panel grows would shift the rows left. */
+.list::-webkit-scrollbar { display: none; }
 .head, .divider { flex: none; }
 .rows { display: flow-root; }
 .row { display: flex; align-items: center; gap: 14px; padding: 12px; margin: 6px 8px; border-radius: 14px; }
