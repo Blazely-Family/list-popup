@@ -34,6 +34,7 @@ tap_action:
 | `noun` | Adds a count to the header, e.g. `device` gives "1 device", "3 devices". Without it the header shows the bare count. |
 | `since` | `false` hides the time column. |
 | `empty` | Text when the list is empty. Default "Nothing to show". |
+| `style` | This pop-up's own CSS variables, e.g. `{ "--list-popup-background": "#3b434d" }`, over the theme's. |
 | `auto_close` | Seconds without a touch, click, scroll or key before the pop-up closes itself. Default 30; `0` never. It never closes while a camera row is open. |
 | `link` | Optional header button that closes the pop-up and goes to a dashboard path: `{ path: /dashboard/view, label: Show all }`. `label` defaults to "Show all". |
 | `secondary` | How the line under each name is built from the item's fields: a list of parts joined with " · ". A part is a field name, or `{ field, unit?, prefix?, text?, map?, duration?, round?, names? }`: `text` is shown when the field is true, `names: true` shows entity ids as HA's own entity names, `map` translates values, `duration: true` shows seconds as "14m", `round` sets decimal places, otherwise prefix + value + unit. List values are joined with ", ". |
@@ -107,6 +108,6 @@ with `secondary: [area, sensors]` in the pop-up config, the row reads
 
 The pop-up uses `--ha-dialog-surface-background`, so it matches HA's own
 dialogs. Override it with `--list-popup-background`, `--list-popup-border`,
-`--list-popup-shadow` and `--list-popup-backdrop` (no blur by default: it's hard on tablet GPUs).
+`--list-popup-shadow`, `--list-popup-scrim` (the dimmed backdrop) and `--list-popup-backdrop` (no blur by default: it's hard on tablet GPUs).
 A pop-up opened from an anchor takes these, and the theme colours it draws
 with, from where it was opened, so a view's own theme reaches it.

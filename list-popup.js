@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.18.1";
+const VERSION = "0.19.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -36,7 +36,7 @@ function currentHass() {
 
 // Theme variables the pop-up draws with, carried over from where it was opened.
 const THEME_VARS = [
-  "--list-popup-background", "--list-popup-border", "--list-popup-backdrop", "--list-popup-shadow",
+  "--list-popup-background", "--list-popup-border", "--list-popup-backdrop", "--list-popup-shadow", "--list-popup-scrim",
   "--ha-dialog-surface-background", "--mdc-theme-surface", "--ha-card-border-color", "--divider-color",
   "--primary-text-color", "--secondary-text-color", "--ha-font-family-body",
   "--state-light-active-color", "--amber-color",
@@ -49,6 +49,8 @@ class ListPopup extends HTMLElement {
     // Cards redraw themselves, replacing the anchor element; remember where it
     // lives and its id (the attribute's value) to find its replacement.
     this._anchorRoot = this._anchor && this._anchor.getRootNode();
+    // `style`: this pop-up's own CSS variables, e.g. { "--list-popup-background": "…" }.
+    this._ownStyle = Object.entries(this._cfg.style || {}).filter(([k]) => k.startsWith("--"));
     this._anchorId = this._anchor && this._anchor.getAttribute("data-popup-anchor");
     // The pop-up lives outside the view, so a view's own theme wouldn't reach
     // it: carry over the look it was opened in.
@@ -59,6 +61,7 @@ class ListPopup extends HTMLElement {
         if (val) this.style.setProperty(v, val);
       });
     }
+    this._ownStyle.forEach(([k, v]) => this.style.setProperty(k, String(v)));
     this._sig = null;
     this._expanded = null; // key of the row whose camera is showing
     this._sent = {}; // key -> time its action was sent
@@ -618,12 +621,12 @@ class ListPopup extends HTMLElement {
 const STYLE = `
 :host { position: fixed; inset: 0; z-index: 9; display: block;
   font-family: var(--ha-font-family-body, var(--paper-font-body1_-_font-family, inherit)); }
-.scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
+.scrim { position: absolute; inset: 0; background: var(--list-popup-scrim, rgba(0, 0, 0, 0.45)); }
 .spot { display: none; }
 /* Anchored: the backdrop is drawn round the anchor instead, leaving it lit. */
 :host(.anchored) .scrim { background: transparent; }
 :host(.anchored) .spot { display: block; position: absolute; pointer-events: none; left: var(--sx); top: var(--sy);
-  width: var(--sw); height: var(--sh); border-radius: var(--sr); box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.45); }
+  width: var(--sw); height: var(--sh); border-radius: var(--sr); box-shadow: 0 0 0 200vmax var(--list-popup-scrim, rgba(0, 0, 0, 0.45)); }
 :host(.anchored) .dialog { left: var(--lp-left); top: var(--lp-top); bottom: var(--lp-bottom); transform: none;
   max-height: var(--lp-max); transform-origin: var(--lp-origin); }
 :host(.anchored) .dialog.enter { animation: lp-in 160ms ease-out; }
