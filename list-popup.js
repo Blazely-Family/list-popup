@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -91,6 +91,10 @@ class ListPopup extends HTMLElement {
     const c = this._cfg;
     const items = this._items(hass);
     const colour = colourOf(c.colour);
+    // `icon_colour` colours the icons themselves (as on a quiet status strip pill);
+    // rows are tinted with it, else with the chip colour.
+    const iconFg = c.icon_colour || colour.fg;
+    const tint = c.icon_colour || colour.bg;
     const icon = c.icon || "mdi:format-list-bulleted";
     const n = items.length;
     const count = c.noun ? `${n} ${esc(c.noun)}${n === 1 ? "" : "s"}` : `${n}`;
@@ -109,9 +113,9 @@ class ListPopup extends HTMLElement {
       : "";
     const body = rows || `<div class="empty">${esc(c.empty || "Nothing to show")}</div>`;
     const html = `<div class="scrim"></div>
-      <div class="dialog" role="dialog" aria-modal="true" style="--c:${esc(colour.bg)}">
+      <div class="dialog" role="dialog" aria-modal="true" style="--c:${esc(tint)}">
         <div class="head">
-          <div class="lead" style="background:${esc(colour.bg)};color:${esc(colour.fg)}"><ha-icon icon="${esc(icon)}"></ha-icon></div>
+          <div class="lead" style="background:${esc(colour.bg)};color:${esc(iconFg)}"><ha-icon icon="${esc(icon)}"></ha-icon></div>
           <div class="title">${esc(c.title || "")}<span class="sub"> · ${count}</span></div>
           ${link}<ha-icon class="close" icon="mdi:close"></ha-icon>
         </div>

@@ -30,6 +30,7 @@ tap_action:
 | `attribute` | The attribute holding the list. Default `items`. |
 | `title`, `icon` | Header text and icon. |
 | `colour` | Header chip and row icon colour: `yellow`, `green`, `blue`, `red`, `grey`, `quiet` (default), or any CSS colour. |
+| `icon_colour` | Colour of the header icon (on its `colour` chip) and of the row icons, e.g. an orange icon on a quiet chip, as on a status strip pill. |
 | `noun` | Adds a count to the header, e.g. `device` gives "1 device", "3 devices". Without it the header shows the bare count. |
 | `since` | `false` hides the time column. |
 | `empty` | Text when the list is empty. Default "Nothing to show". |
