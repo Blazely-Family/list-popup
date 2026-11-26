@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.16.0";
+const VERSION = "0.16.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -115,7 +115,7 @@ class ListPopup extends HTMLElement {
     const when = today
       ? d.toLocaleTimeString(lang, { hour: "numeric", minute: "2-digit" })
       : d.toLocaleDateString(lang, { day: "numeric", month: "short" });
-    return `since<br>${esc(when)}`;
+    return `since ${esc(when)}`;
   }
 
   // The row's action button. It disables once sent and comes back after a minute
@@ -581,7 +581,7 @@ ha-icon { display: flex; line-height: 0; }
 .txt { flex: 1 1 auto; min-width: 0; }
 .name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sec { font-size: 13px; margin-top: 2px; color: var(--secondary-text-color, #a3a7b0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.since { flex: none; font-size: 13px; text-align: right; color: var(--secondary-text-color, #a3a7b0); }
+.since { flex: none; font-size: 13px; text-align: right; white-space: nowrap; color: var(--secondary-text-color, #a3a7b0); }
 .btn { flex: none; display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 12px;
   border: none; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
   background: rgba(158, 158, 158, 0.25); color: var(--primary-text-color, #eaebee); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
