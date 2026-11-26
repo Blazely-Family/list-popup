@@ -52,6 +52,14 @@ camera_card:
     default: live
 ```
 
+### Hanging from what opened it
+
+If the tapped element (or one around it) has a `data-popup-anchor` attribute,
+the pop-up hangs just below it, right edges lined up (kept on screen near an
+edge, and above it if there's more room there), and the anchor stays lit
+through the dimmed backdrop. Status Strip Card pills are anchors. Without one,
+the pop-up is centred.
+
 The list follows the helper while the pop-up is open. Escape, the close
 button or a tap outside closes it.
 

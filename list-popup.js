@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.16.2";
+const VERSION = "0.17.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -35,8 +35,9 @@ function currentHass() {
 }
 
 class ListPopup extends HTMLElement {
-  open(cfg) {
+  open(cfg, anchor) {
     this._cfg = cfg || {};
+    this._anchor = anchor && anchor.isConnected ? anchor : null;
     this._sig = null;
     this._expanded = null; // key of the row whose camera is showing
     this._sent = {}; // key -> time its action was sent
@@ -56,6 +57,9 @@ class ListPopup extends HTMLElement {
     // ancestors, and outside the app they fall back to slow snapshots.
     const ha = document.querySelector("home-assistant");
     (ha && ha.shadowRoot ? ha.shadowRoot : document.body).appendChild(this);
+    this._place();
+    this._onResize = () => { this._place(); this._sig = null; this._render(); };
+    window.addEventListener("resize", this._onResize);
     this._render();
     // Follow the helper while open, so the list stays current.
     this._timer = setInterval(() => this._render(), 1000);
@@ -80,6 +84,7 @@ class ListPopup extends HTMLElement {
     this._dropCards();
     document.removeEventListener("keydown", this._key);
     window.removeEventListener("location-changed", this._nav);
+    window.removeEventListener("resize", this._onResize);
     this.remove();
     if (ListPopup.current === this) ListPopup.current = null;
   }
@@ -248,7 +253,7 @@ class ListPopup extends HTMLElement {
       const want =
         (head ? head.offsetHeight : 0) + (divider ? divider.offsetHeight : 0) +
         rows.offsetHeight + parseFloat(ls.paddingTop) + parseFloat(ls.paddingBottom) + chrome;
-      const h = Math.min(want, window.innerHeight * 0.7);
+      const h = Math.min(want, this._maxH || window.innerHeight * 0.7);
       if (Math.abs(h - (this._lastH || 0)) < 1) return;
       this._lastH = h;
       dlg.style.height = `${h}px`;
@@ -282,6 +287,38 @@ class ListPopup extends HTMLElement {
     };
     el.addEventListener("transitionend", (ev) => { if (ev.target === el && ev.propertyName === "height") end(); });
     setTimeout(end, 320);
+  }
+
+  // Opened from an anchor (e.g. a status strip pill): the panel hangs just
+  // below it with their right edges lined up (kept on screen near an edge),
+  // and the anchor stays lit through a hole in the dimmed backdrop, so the
+  // panel reads as belonging to it. Above it instead if there's more room there.
+  _place() {
+    const a = this._anchor;
+    if (!a || !a.isConnected) {
+      this.classList.remove("anchored");
+      this._maxH = null;
+      return;
+    }
+    const r = a.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight, gap = 8, edge = 16;
+    const w = Math.min(560, vw - 2 * edge);
+    const left = Math.min(Math.max(r.right - w, edge), vw - edge - w);
+    const below = vh - r.bottom - gap - edge, above = r.top - gap - edge;
+    const down = below >= 320 || below >= above;
+    this._maxH = Math.max(120, down ? below : above);
+    const st = this.style;
+    st.setProperty("--lp-left", `${left}px`);
+    st.setProperty("--lp-top", down ? `${r.bottom + gap}px` : "auto");
+    st.setProperty("--lp-bottom", down ? "auto" : `${vh - r.top + gap}px`);
+    st.setProperty("--lp-max", `${this._maxH}px`);
+    st.setProperty("--lp-origin", `${Math.min(Math.max(r.left + r.width / 2 - left, 0), w)}px ${down ? "0" : "100%"}`);
+    st.setProperty("--sx", `${r.left}px`);
+    st.setProperty("--sy", `${r.top}px`);
+    st.setProperty("--sw", `${r.width}px`);
+    st.setProperty("--sh", `${r.height}px`);
+    st.setProperty("--sr", getComputedStyle(a).borderRadius || "999px");
+    this.classList.add("anchored");
   }
 
   _dropCards() {
@@ -374,6 +411,7 @@ class ListPopup extends HTMLElement {
   _render() {
     const hass = currentHass();
     if (!hass || !this.shadowRoot) return;
+    this._place(); // follow the anchor if it moves or resizes
     const c = this._cfg;
     const items = this._items(hass);
     const n = items.length;
@@ -456,8 +494,8 @@ class ListPopup extends HTMLElement {
       ? `<a class="link" href="${esc(c.link.path)}">${esc(c.link.label || "Show all")}</a>`
       : "";
     const body = rows || `<div class="empty">${esc(c.empty || "Nothing to show")}</div>`;
-    const html = `<div class="scrim"></div>
-      <div class="dialog" role="dialog" aria-modal="true" style="--c:${esc(tint)}">
+    const html = `<div class="scrim"></div><div class="spot"></div>
+      <div class="dialog${this._entered ? "" : " enter"}" role="dialog" aria-modal="true" style="--c:${esc(tint)}">
         <div class="head">
           <div class="lead" style="background:${esc(colour.bg)};color:${esc(iconFg)}"><ha-icon icon="${esc(icon)}"></ha-icon></div>
           <div class="title">${esc(c.title || "")}<span class="sub"> · ${count}</span></div>
@@ -494,6 +532,7 @@ class ListPopup extends HTMLElement {
     this._sig = html;
     this._shown = items;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${html}`;
+    this._entered = true;
     this._stateIcons(hass);
     const openItem = this._expanded && items.find((i) => this._keyOf(i) === this._expanded);
     if (openItem) this._placeCards(hass, openItem, this._expanded);
@@ -548,6 +587,15 @@ const STYLE = `
 :host { position: fixed; inset: 0; z-index: 9; display: block;
   font-family: var(--ha-font-family-body, var(--paper-font-body1_-_font-family, inherit)); }
 .scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
+.spot { display: none; }
+/* Anchored: the backdrop is drawn round the anchor instead, leaving it lit. */
+:host(.anchored) .scrim { background: transparent; }
+:host(.anchored) .spot { display: block; position: absolute; pointer-events: none; left: var(--sx); top: var(--sy);
+  width: var(--sw); height: var(--sh); border-radius: var(--sr); box-shadow: 0 0 0 200vmax rgba(0, 0, 0, 0.45); }
+:host(.anchored) .dialog { left: var(--lp-left); top: var(--lp-top); bottom: var(--lp-bottom); transform: none;
+  max-height: var(--lp-max); transform-origin: var(--lp-origin); }
+:host(.anchored) .dialog.enter { animation: lp-in 160ms ease-out; }
+@keyframes lp-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 .dialog {
   position: absolute; left: 50%; top: 12vh; transform: translateX(-50%);
   width: min(560px, calc(100vw - 32px)); max-height: 70vh; transition: height 260ms ease; display: flex; flex-direction: column;
@@ -612,6 +660,14 @@ ha-icon { display: flex; line-height: 0; }
 if (!customElements.get("list-popup")) {
   customElements.define("list-popup", ListPopup);
 
+  // The element a pop-up hangs from: the innermost element marked
+  // `data-popup-anchor` (e.g. a status strip pill) on the click that opened it.
+  let lastAnchor = null, lastAt = 0;
+  window.addEventListener("click", (ev) => {
+    lastAnchor = ev.composedPath().find((el) => el instanceof HTMLElement && el.hasAttribute("data-popup-anchor")) || null;
+    lastAt = Date.now();
+  }, true);
+
   // Any card's `tap_action: { action: fire-dom-event, list_popup: {...} }` opens it.
   window.addEventListener("ll-custom", (ev) => {
     const cfg = ev.detail && ev.detail.list_popup;
@@ -619,7 +675,7 @@ if (!customElements.get("list-popup")) {
     if (ListPopup.current) ListPopup.current.close();
     const popup = document.createElement("list-popup");
     ListPopup.current = popup;
-    popup.open(cfg);
+    popup.open(cfg, Date.now() - lastAt < 1500 ? lastAnchor : null);
   });
 
   console.info(`%c LIST-POPUP %c ${VERSION} `, "background:#43a047;color:#fff", "");
