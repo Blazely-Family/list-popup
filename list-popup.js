@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.8.1";
+const VERSION = "0.9.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -111,7 +111,8 @@ class ListPopup extends HTMLElement {
     const service = a && (a.service || a.action);
     if (!service) return "";
     const look = { ...((this._cfg.actions || {})[service] || {}), ...a };
-    const sent = this._sent[key] && Date.now() - this._sent[key] < 60000;
+    const sentAt = this._sent[`${key}|${service}`];
+    const sent = sentAt && Date.now() - sentAt < 60000;
     const col = colourOf(look.colour || "quiet");
     const fill = (t) => String(t).replace(/\{name\}/g, item.name || "");
     const label = fill(sent ? look.busy_label || "Sent…" : look.label || "Go");
@@ -260,7 +261,9 @@ class ListPopup extends HTMLElement {
     if (!hass || !svc) return;
     const [domain, service] = String(svc).split(".");
     if (!domain || !service) return;
-    this._sent[key] = Date.now();
+    // Remember per row AND service, so a new action (e.g. Stop while a gate
+    // closes) is live straight away rather than greyed out by the last one.
+    this._sent[`${key}|${svc}`] = Date.now();
     hass.callService(domain, service, a.data || {}, a.target || (item.entity_id ? { entity_id: item.entity_id } : undefined));
     this._sig = null;
     this._render();
@@ -307,12 +310,13 @@ class ListPopup extends HTMLElement {
         const open = cams.length > 0 && this._expanded === key;
         // A row with a camera expands (chevron); its action sits under the feed, so you look first.
         const right = cams.length
-          ? `<ha-icon class="chev" data-view="${esc(key)}" icon="${open ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`
+          ? `<ha-icon class="chev" icon="${open ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`
           : this._actionButton(i, key, false);
-        const head = `<div class="row${open ? " open" : ""}"><div class="icon">${rowIcon}</div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
+        const head = `<div class="row${open ? " open" : ""}${cams.length ? " tap" : ""}"${cams.length ? ` data-view="${esc(key)}"` : ""}><div class="icon">${rowIcon}</div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
         const feeds = cams.map((cam) => this._feed(hass, cam.entity)).join("");
-        return `${head}<div class="expand"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}${c.camera_card ? cams.map((_, n) => `<div class="cell"><slot name="feed-${n}"></slot></div>`).join("") : ""}</div>${this._actionButton(i, key, true)}</div>`;
+        const grow = this._grow === key ? " grow" : "";
+        return `${head}<div class="expand${grow}"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}${c.camera_card ? cams.map((_, n) => `<div class="cell"><slot name="feed-${n}"></slot></div>`).join("") : ""}</div>${this._actionButton(i, key, true)}</div>`;
       })
       .join("");
     const link = c.link && c.link.path
@@ -344,9 +348,13 @@ class ListPopup extends HTMLElement {
     if (openItem) this._placeCards(hass, openItem, this._expanded);
     this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());
     this.shadowRoot.querySelector(".close").addEventListener("click", () => this.close());
+    // The whole row (not just its chevron) opens and closes its cameras.
     this.shadowRoot.querySelectorAll("[data-view]").forEach((b) =>
       b.addEventListener("click", () => {
         this._expanded = this._expanded === b.dataset.view ? null : b.dataset.view;
+        this._grow = this._expanded; // animate this row's opening once
+        clearTimeout(this._growTimer);
+        this._growTimer = setTimeout(() => (this._grow = null), 400);
         this._sig = null;
         this._render();
       })
@@ -412,6 +420,9 @@ ha-icon { display: flex; line-height: 0; }
 .btn:disabled { opacity: 0.55; cursor: default; }
 .btn.wide { width: 100%; height: 46px; margin-top: 10px; font-size: 15px; }
 .row.open { background: rgba(255, 255, 255, 0.05); border-radius: 14px 14px 0 0; margin-bottom: 0; }
+.row.tap { cursor: pointer; }
+.expand.grow { animation: grow 280ms ease-out; overflow: hidden; }
+@keyframes grow { from { max-height: 0; opacity: 0; } to { max-height: 900px; opacity: 1; } }
 .expand { margin: 0 8px 6px; padding: 0 12px 12px; background: rgba(255, 255, 255, 0.05); border-radius: 0 0 14px 14px; }
 .feed { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; background: #111; }
 .feed img { display: block; width: 100%; height: 100%; object-fit: cover; }
