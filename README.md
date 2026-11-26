@@ -51,7 +51,7 @@ The attribute is a list (or a JSON string of one) of:
 | `since` | A timestamp shown as "since 11:00 pm" (today) or "since 25 Nov". Falls back to when `entity_id` last changed. |
 | `entity_id` | Optional; used for the fallbacks above and as the default action target. |
 | `action` | Optional row button: `{ label, icon?, action: domain.service, target?, data?, colour?, busy_label? }`. Tapping calls the service (target defaults to `entity_id`), then the button shows `busy_label` (default "Sent…") disabled. It comes back after a minute if the row is still listed; normally the helper drops the row once the action has worked. |
-| `camera` | Optional camera entity. The row then shows **View**, which expands a live feed (HA's MJPEG camera proxy) with the `action` button under it, so you look before acting. |
+| `camera` / `cameras` | Optional camera entity, or a list of them. The row then shows **View**, which expands the live feeds (HA's MJPEG camera proxy; two side by side) with the `action` button under them, so you look before acting. Only one row is expanded at a time. |
 | `key` | Optional stable id for the row (default `entity_id`, then `name`). |
 
 When the last row disappears while the pop-up is open (for example the gate

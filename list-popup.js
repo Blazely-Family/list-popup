@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -109,9 +109,10 @@ class ListPopup extends HTMLElement {
   _feed(hass, cam) {
     const st = hass.states[cam];
     const token = st && st.attributes.access_token;
+    const label = (st && st.attributes.friendly_name) || cam;
     if (!token) return `<div class="feed off">Camera unavailable</div>`;
     // HA's own MJPEG proxy: works anywhere an <img> does, no extra card needed.
-    return `<div class="feed"><img src="/api/camera_proxy_stream/${esc(cam)}?token=${esc(token)}" alt=""><span class="live">LIVE</span></div>`;
+    return `<div class="feed"><img src="/api/camera_proxy_stream/${esc(cam)}?token=${esc(token)}" alt=""><span class="live">LIVE</span><span class="cam">${esc(label)}</span></div>`;
   }
 
   _run(item, key) {
@@ -153,14 +154,17 @@ class ListPopup extends HTMLElement {
         const since = c.since === false ? "" : `<div class="since">${this._since(hass, i)}</div>`;
         const name = i.name || (st && st.attributes.friendly_name) || i.entity_id;
         const sec = i.secondary ? `<div class="sec">${esc(i.secondary)}</div>` : "";
-        const open = i.camera && this._expanded === key;
+        // `cameras` (or one `camera`): shown side by side when the row is expanded.
+        const cams = [].concat(i.cameras || i.camera || []).filter(Boolean);
+        const open = cams.length > 0 && this._expanded === key;
         // A row with a camera shows View; its action sits under the feed, so you look first.
-        const right = i.camera
+        const right = cams.length
           ? `<button class="btn${open ? " on" : ""}" data-view="${esc(key)}"><ha-icon icon="${open ? "mdi:chevron-up" : "mdi:cctv"}"></ha-icon><span>${open ? "Hide" : "View"}</span></button>`
           : this._actionButton(i, key, false);
         const head = `<div class="row${open ? " open" : ""}"><div class="icon"><ha-icon icon="${esc(ri)}"></ha-icon></div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
-        return `${head}<div class="expand">${this._feed(hass, i.camera)}${this._actionButton(i, key, true)}</div>`;
+        const feeds = cams.map((cam) => this._feed(hass, cam)).join("");
+        return `${head}<div class="expand"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}</div>${this._actionButton(i, key, true)}</div>`;
       })
       .join("");
     const link = c.link && c.link.path
@@ -215,7 +219,7 @@ const STYLE = `
 .scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
 .dialog {
   position: absolute; left: 50%; top: 12vh; transform: translateX(-50%);
-  width: min(520px, calc(100vw - 32px)); max-height: 70vh; display: flex; flex-direction: column;
+  width: min(560px, calc(100vw - 32px)); max-height: 70vh; display: flex; flex-direction: column;
   box-sizing: border-box; padding: 18px 0 10px; border-radius: 20px; overflow: hidden;
   color: var(--primary-text-color, #eaebee);
   /* The same surface as HA's own dialogs. */
@@ -257,6 +261,10 @@ ha-icon { display: flex; line-height: 0; }
 .feed.off { display: flex; align-items: center; justify-content: center; color: var(--secondary-text-color, #a3a7b0); }
 .live { position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
   padding: 2px 6px; border-radius: 6px; background: #db4437; color: #fff; }
+.feeds { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.feeds.two { grid-template-columns: 1fr 1fr; }
+.cam { position: absolute; bottom: 6px; left: 8px; right: 8px; font-size: 12px; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .empty { padding: 16px 20px; color: var(--secondary-text-color, #a3a7b0); }
 `;
 
