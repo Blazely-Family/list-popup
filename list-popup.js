@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.7.1";
+const VERSION = "0.7.2";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -124,8 +124,19 @@ class ListPopup extends HTMLElement {
           : v && typeof v === "object"
             ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x)]))
             : v;
+    const config = fill(this._cfg.camera_card);
+    // Load it the way a dashboard section does: HA's own <hui-card> wrapper
+    // (it creates the card, handles rebuilds and visibility). Fall back to the
+    // card helpers on older frontends.
+    if (customElements.get("hui-card")) {
+      const el = document.createElement("hui-card");
+      el.config = config;
+      el.hass = currentHass();
+      el.preview = false;
+      return el;
+    }
     const helpers = await window.loadCardHelpers();
-    const el = helpers.createCardElement(fill(this._cfg.camera_card));
+    const el = helpers.createCardElement(config);
     el.hass = currentHass();
     return el;
   }
@@ -152,9 +163,9 @@ class ListPopup extends HTMLElement {
     // so redrawing the list never detaches them (a detach restarts the stream).
     this._cards.then((els) => {
       if (this._cardsKey !== key) return;
-      els.forEach((el) => {
+      els.forEach((el, n) => {
         el.hass = currentHass();
-        el.slot = "feeds";
+        el.slot = `feed-${n}`;
         if (el.parentNode !== this) this.appendChild(el);
       });
     });
@@ -163,7 +174,7 @@ class ListPopup extends HTMLElement {
   _dropCards() {
     this._cardsKey = null;
     this._cards = null;
-    this.querySelectorAll('[slot="feeds"]').forEach((el) => el.remove());
+    this.querySelectorAll('[slot^="feed-"]').forEach((el) => el.remove());
   }
 
   // The line under the name, built from the item's fields by the pop-up's
@@ -263,7 +274,7 @@ class ListPopup extends HTMLElement {
         const head = `<div class="row${open ? " open" : ""}"><div class="icon">${rowIcon}</div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
         const feeds = cams.map((cam) => this._feed(hass, cam.entity)).join("");
-        return `${head}<div class="expand"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}${c.camera_card ? `<slot name="feeds"></slot>` : ""}</div>${this._actionButton(i, key, true)}</div>`;
+        return `${head}<div class="expand"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}${c.camera_card ? cams.map((_, n) => `<div class="cell"><slot name="feed-${n}"></slot></div>`).join("") : ""}</div>${this._actionButton(i, key, true)}</div>`;
       })
       .join("");
     const link = c.link && c.link.path
@@ -370,6 +381,7 @@ ha-icon { display: flex; line-height: 0; }
 .feeds { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .feeds.two { grid-template-columns: 1fr 1fr; }
 .feeds > *, ::slotted(*) { display: block; min-width: 0; }
+.cell { min-width: 0; }
 .chev { flex: none; cursor: pointer; padding: 4px; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 24px; }
 .empty { padding: 16px 20px; color: var(--secondary-text-color, #a3a7b0); }
 `;
