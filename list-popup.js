@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.7.2";
+const VERSION = "0.7.3";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -46,7 +46,11 @@ class ListPopup extends HTMLElement {
       if (ev.key === "Escape") this.close();
     };
     document.addEventListener("keydown", this._key);
-    document.body.appendChild(this);
+    // Mount inside Home Assistant itself (where its own dialogs live), not on
+    // <body>: cards such as camera players look up HA context from their
+    // ancestors, and outside the app they fall back to slow snapshots.
+    const ha = document.querySelector("home-assistant");
+    (ha && ha.shadowRoot ? ha.shadowRoot : document.body).appendChild(this);
     this._render();
     // Follow the helper while open, so the list stays current.
     this._timer = setInterval(() => this._render(), 1000);
