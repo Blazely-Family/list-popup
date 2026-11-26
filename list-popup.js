@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.10.0";
+const VERSION = "0.11.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -61,6 +61,7 @@ class ListPopup extends HTMLElement {
 
   close() {
     clearInterval(this._timer);
+    if (this._ro) this._ro.disconnect();
     this._dropCards();
     document.removeEventListener("keydown", this._key);
     window.removeEventListener("location-changed", this._nav);
@@ -182,6 +183,35 @@ class ListPopup extends HTMLElement {
         if (el.parentNode !== this) this.appendChild(el);
       });
     });
+  }
+
+  // Animate the panel's height to fit its content, growing and shrinking
+  // smoothly as rows open, close, or camera cards finish loading. The height
+  // carries over between redraws so a redraw never snaps it.
+  _watchSize() {
+    const dlg = this.shadowRoot.querySelector(".dialog");
+    const rows = this.shadowRoot.querySelector(".rows");
+    if (!dlg || !rows) return;
+    if (this._ro) this._ro.disconnect();
+    if (this._lastH) dlg.style.height = `${this._lastH}px`;
+    const fit = () => {
+      const head = dlg.querySelector(".head");
+      const divider = dlg.querySelector(".divider");
+      const cs = getComputedStyle(dlg);
+      const chrome = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + 2;
+      const list = dlg.querySelector(".list");
+      const ls = getComputedStyle(list);
+      const want =
+        (head ? head.offsetHeight : 0) + (divider ? divider.offsetHeight : 0) +
+        rows.offsetHeight + parseFloat(ls.paddingTop) + parseFloat(ls.paddingBottom) + chrome;
+      const h = Math.min(want, window.innerHeight * 0.7);
+      if (Math.abs(h - (this._lastH || 0)) < 1) return;
+      this._lastH = h;
+      dlg.style.height = `${h}px`;
+    };
+    this._ro = new ResizeObserver(() => fit());
+    this._ro.observe(rows);
+    requestAnimationFrame(fit);
   }
 
   _dropCards() {
@@ -351,7 +381,7 @@ class ListPopup extends HTMLElement {
           ${link}<ha-icon class="close" icon="mdi:close"></ha-icon>
         </div>
         <div class="divider"></div>
-        <div class="list">${body}</div>
+        <div class="list"><div class="rows">${body}</div></div>
       </div>`;
     // Camera cards: drop them when their row closes; keep them current while open.
     if (this._cardsKey && this._cardsKey !== this._expanded) this._dropCards();
@@ -366,6 +396,7 @@ class ListPopup extends HTMLElement {
     this._stateIcons(hass);
     const openItem = this._expanded && items.find((i) => this._keyOf(i) === this._expanded);
     if (openItem) this._placeCards(hass, openItem, this._expanded);
+    this._watchSize();
     this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());
     this.shadowRoot.querySelector(".close").addEventListener("click", () => this.close());
     // The whole row (not just its chevron) opens and closes its cameras.
@@ -404,7 +435,7 @@ const STYLE = `
 .scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
 .dialog {
   position: absolute; left: 50%; top: 12vh; transform: translateX(-50%);
-  width: min(560px, calc(100vw - 32px)); max-height: 70vh; display: flex; flex-direction: column;
+  width: min(560px, calc(100vw - 32px)); max-height: 70vh; transition: height 260ms ease; display: flex; flex-direction: column;
   box-sizing: border-box; padding: 18px 0 10px; border-radius: 20px; overflow: hidden;
   color: var(--primary-text-color, #eaebee);
   /* The same surface as HA's own dialogs. */
@@ -424,7 +455,9 @@ ha-icon { display: flex; line-height: 0; }
   color: var(--primary-text-color, #eaebee); background: rgba(158, 158, 158, 0.25); }
 .close { cursor: pointer; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 22px; padding: 4px; }
 .divider { height: 1px; background: var(--divider-color, rgba(255, 255, 255, 0.08)); margin: 0 20px; }
-.list { overflow-y: auto; padding: 4px 0; }
+.list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 0; }
+.head, .divider { flex: none; }
+.rows { display: flow-root; }
 .row { display: flex; align-items: center; gap: 14px; padding: 12px; margin: 6px 8px; border-radius: 14px; }
 .icon { flex: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px;
   background: color-mix(in srgb, var(--c) 30%, transparent); color: color-mix(in srgb, var(--c) 88%, white); --mdc-icon-size: 22px; }
@@ -441,8 +474,6 @@ ha-icon { display: flex; line-height: 0; }
 .btn.wide { width: 100%; height: 46px; margin-top: 10px; font-size: 15px; }
 .row.open { background: rgba(255, 255, 255, 0.05); border-radius: 14px 14px 0 0; margin-bottom: 0; }
 .row.tap { cursor: pointer; }
-.expand.grow { animation: grow 280ms ease-out; overflow: hidden; }
-@keyframes grow { from { max-height: 0; opacity: 0; } to { max-height: 900px; opacity: 1; } }
 .expand { margin: 0 8px 6px; padding: 0 12px 12px; background: rgba(255, 255, 255, 0.05); border-radius: 0 0 14px 14px; }
 .feed { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; background: #111; }
 .feed img { display: block; width: 100%; height: 100%; object-fit: cover; }
