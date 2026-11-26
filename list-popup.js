@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.17.4";
+const VERSION = "0.18.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -34,6 +34,14 @@ function currentHass() {
   return root && root.hass;
 }
 
+// Theme variables the pop-up draws with, carried over from where it was opened.
+const THEME_VARS = [
+  "--list-popup-background", "--list-popup-border", "--list-popup-backdrop",
+  "--ha-dialog-surface-background", "--mdc-theme-surface", "--ha-card-border-color", "--divider-color",
+  "--primary-text-color", "--secondary-text-color", "--ha-font-family-body",
+  "--state-light-active-color", "--amber-color",
+];
+
 class ListPopup extends HTMLElement {
   open(cfg, anchor) {
     this._cfg = cfg || {};
@@ -42,6 +50,15 @@ class ListPopup extends HTMLElement {
     // lives and its id (the attribute's value) to find its replacement.
     this._anchorRoot = this._anchor && this._anchor.getRootNode();
     this._anchorId = this._anchor && this._anchor.getAttribute("data-popup-anchor");
+    // The pop-up lives outside the view, so a view's own theme wouldn't reach
+    // it: carry over the look it was opened in.
+    if (this._anchor) {
+      const cs = getComputedStyle(this._anchor);
+      THEME_VARS.forEach((v) => {
+        const val = cs.getPropertyValue(v).trim();
+        if (val) this.style.setProperty(v, val);
+      });
+    }
     this._sig = null;
     this._expanded = null; // key of the row whose camera is showing
     this._sent = {}; // key -> time its action was sent
@@ -620,8 +637,8 @@ const STYLE = `
   background: var(--list-popup-background, var(--ha-dialog-surface-background, var(--mdc-theme-surface, #1c1d21)));
   border: 1px solid var(--list-popup-border, var(--ha-card-border-color, var(--divider-color)));
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  -webkit-backdrop-filter: var(--list-popup-backdrop, blur(18px));
-  backdrop-filter: var(--list-popup-backdrop, blur(18px));
+  -webkit-backdrop-filter: var(--list-popup-backdrop, none);
+  backdrop-filter: var(--list-popup-backdrop, none);
 }
 ha-icon { display: flex; line-height: 0; }
 .head { display: flex; align-items: center; gap: 12px; padding: 0 20px 12px; }
