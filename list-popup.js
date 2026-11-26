@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.8.0";
+const VERSION = "0.8.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -189,18 +189,37 @@ class ListPopup extends HTMLElement {
     this.querySelectorAll('[slot^="feed-"]').forEach((el) => el.remove());
   }
 
+  // HA's own name for an entity: the frontend's formatter where this HA has it,
+  // else the entity registry's name, else the friendly name.
+  _entityName(hass, id) {
+    const st = hass.states[id];
+    try {
+      if (st && typeof hass.formatEntityName === "function") {
+        const n = hass.formatEntityName(st, "entity");
+        if (n) return n;
+      }
+    } catch (e) {
+      /* fall through */
+    }
+    const reg = hass.entities && hass.entities[id];
+    return (reg && reg.name) || (st && st.attributes.friendly_name) || id;
+  }
+
   // The line under the name, built from the item's fields by the pop-up's
   // `secondary` config: a list of parts joined with " · ". A part is a field
   // name, or { field, unit?, prefix?, text?, map?, duration?, round? }: `text` shows when the field
   // is true; `map` translates values; otherwise prefix + value + unit. A list
   // value is joined with ", ". Without `secondary`, the item's own `secondary`.
-  _secondary(item) {
+  _secondary(hass, item) {
     const spec = this._cfg.secondary;
     if (!Array.isArray(spec)) return item.secondary || "";
     const parts = spec.map((p) => {
       const part = typeof p === "string" ? { field: p } : p || {};
       let v = item[part.field];
       if (v === undefined || v === null || v === "" || v === false) return "";
+      // `names`: the field holds entity ids; show HA's own entity names (as a
+      // tile under its device would, e.g. "Door"), else their friendly names.
+      if (part.names) v = [].concat(v).map((id) => this._entityName(hass, id));
       if (Array.isArray(v)) v = v.filter((x) => x !== null && x !== "").join(", ");
       if (part.text !== undefined) return v ? part.text : "";
       if (part.map) v = part.map[v] ?? v;
@@ -281,7 +300,7 @@ class ListPopup extends HTMLElement {
             : `<ha-icon icon="${esc(icon)}"></ha-icon>`;
         const since = c.since === false ? "" : `<div class="since">${this._since(hass, i)}</div>`;
         const name = i.name || (st && st.attributes.friendly_name) || i.entity_id;
-        const secText = this._secondary(i);
+        const secText = this._secondary(hass, i);
         const sec = secText ? `<div class="sec">${esc(secText)}</div>` : "";
         // `cameras` (or one `camera`): shown side by side when the row is expanded.
         const cams = this._camList(i);
