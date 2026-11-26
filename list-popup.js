@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.13.0";
+const VERSION = "0.14.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -59,10 +59,23 @@ class ListPopup extends HTMLElement {
     this._render();
     // Follow the helper while open, so the list stays current.
     this._timer = setInterval(() => this._render(), 1000);
+    // `auto_close` (seconds, default 30; 0 = never): close after that long
+    // with no touch, click, scroll or key. Not while a camera row is open.
+    this._touched = Date.now();
+    this._poke = () => (this._touched = Date.now());
+    ["pointerdown", "wheel", "touchmove", "keydown"].forEach((e) => this.addEventListener(e, this._poke, true));
+    const idle = this._cfg.auto_close ?? 30;
+    if (idle > 0) {
+      this._idle = setInterval(() => {
+        if (this._expanded) this._touched = Date.now();
+        else if (Date.now() - this._touched > idle * 1000) this.close();
+      }, 1000);
+    }
   }
 
   close() {
     clearInterval(this._timer);
+    clearInterval(this._idle);
     if (this._ro) this._ro.disconnect();
     this._dropCards();
     document.removeEventListener("keydown", this._key);
@@ -149,7 +162,7 @@ class ListPopup extends HTMLElement {
         : sent ? look.busy_label || "Sent…" : look.label || "Go"
     );
     const ic = look.icon ? `<ha-icon icon="${esc(look.icon)}"></ha-icon>` : "";
-    return `<button class="btn${wide ? " wide" : ""}" data-act="${esc(key)}" ${sent || busyValue ? "disabled" : ""}
+    return `<button class="btn${wide ? " wide" : ""}" data-act="${esc(key)}" ${sent || busyValue || look.disabled ? "disabled" : ""}
       style="background:${esc(col.bg)};color:${esc(col.fg)}">${ic}<span>${esc(label)}</span></button>`;
   }
 
