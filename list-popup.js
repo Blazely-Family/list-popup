@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.7.0";
+const VERSION = "0.7.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -54,6 +54,7 @@ class ListPopup extends HTMLElement {
 
   close() {
     clearInterval(this._timer);
+    this._dropCards();
     document.removeEventListener("keydown", this._key);
     this.remove();
     if (ListPopup.current === this) ListPopup.current = null;
@@ -147,15 +148,22 @@ class ListPopup extends HTMLElement {
         })
       );
     }
+    // The cards live in the pop-up's light DOM and are shown through a <slot>,
+    // so redrawing the list never detaches them (a detach restarts the stream).
     this._cards.then((els) => {
       if (this._cardsKey !== key) return;
-      const slot = this.shadowRoot.querySelector(".feeds");
-      if (!slot) return;
       els.forEach((el) => {
         el.hass = currentHass();
-        if (el.parentNode !== slot) slot.appendChild(el);
+        el.slot = "feeds";
+        if (el.parentNode !== this) this.appendChild(el);
       });
     });
+  }
+
+  _dropCards() {
+    this._cardsKey = null;
+    this._cards = null;
+    this.querySelectorAll('[slot="feeds"]').forEach((el) => el.remove());
   }
 
   // The line under the name, built from the item's fields by the pop-up's
@@ -255,7 +263,7 @@ class ListPopup extends HTMLElement {
         const head = `<div class="row${open ? " open" : ""}"><div class="icon">${rowIcon}</div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
         const feeds = cams.map((cam) => this._feed(hass, cam.entity)).join("");
-        return `${head}<div class="expand"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}</div>${this._actionButton(i, key, true)}</div>`;
+        return `${head}<div class="expand"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}${c.camera_card ? `<slot name="feeds"></slot>` : ""}</div>${this._actionButton(i, key, true)}</div>`;
       })
       .join("");
     const link = c.link && c.link.path
@@ -273,10 +281,7 @@ class ListPopup extends HTMLElement {
         <div class="list">${body}</div>
       </div>`;
     // Camera cards: drop them when their row closes; keep them current while open.
-    if (this._cardsKey && this._cardsKey !== this._expanded) {
-      this._cardsKey = null;
-      this._cards = null;
-    }
+    if (this._cardsKey && this._cardsKey !== this._expanded) this._dropCards();
     if (this._cards) this._cards.then((els) => els.forEach((el) => (el.hass = hass)));
     if (html === this._sig) {
       this._stateIcons(hass);
@@ -364,7 +369,7 @@ ha-icon { display: flex; line-height: 0; }
 .feed.off { display: flex; align-items: center; justify-content: center; color: var(--secondary-text-color, #a3a7b0); }
 .feeds { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .feeds.two { grid-template-columns: 1fr 1fr; }
-.feeds > * { display: block; min-width: 0; }
+.feeds > *, ::slotted(*) { display: block; min-width: 0; }
 .chev { flex: none; cursor: pointer; padding: 4px; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 24px; }
 .empty { padding: 16px 20px; color: var(--secondary-text-color, #a3a7b0); }
 `;
