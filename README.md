@@ -49,7 +49,14 @@ The attribute is a list (or a JSON string of one) of:
 | `secondary` | The line under the name. |
 | `icon` | Row icon. Falls back to `entity_id`'s icon, then the header icon. |
 | `since` | A timestamp shown as "since 11:00 pm" (today) or "since 25 Nov". Falls back to when `entity_id` last changed. |
-| `entity_id` | Optional; used only for the fallbacks above. |
+| `entity_id` | Optional; used for the fallbacks above and as the default action target. |
+| `action` | Optional row button: `{ label, icon?, action: domain.service, target?, data?, colour?, busy_label? }`. Tapping calls the service (target defaults to `entity_id`), then the button shows `busy_label` (default "Sent…") disabled. It comes back after a minute if the row is still listed; normally the helper drops the row once the action has worked. |
+| `camera` | Optional camera entity. The row then shows **View**, which expands a live feed (HA's MJPEG camera proxy) with the `action` button under it, so you look before acting. |
+| `key` | Optional stable id for the row (default `entity_id`, then `name`). |
+
+When the last row disappears while the pop-up is open (for example the gate
+it was showing has shut), the pop-up closes itself after a moment. Set
+`close_when_empty: false` in the pop-up config to keep it open.
 
 A template sensor can build it, for example:
 

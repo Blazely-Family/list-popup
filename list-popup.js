@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.3.0";
+const VERSION = "0.4.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -38,6 +38,9 @@ class ListPopup extends HTMLElement {
   open(cfg) {
     this._cfg = cfg || {};
     this._sig = null;
+    this._expanded = null; // key of the row whose camera is showing
+    this._sent = {}; // key -> time its action was sent
+    this._hadItems = false;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this._key = (ev) => {
       if (ev.key === "Escape") this.close();
@@ -51,6 +54,7 @@ class ListPopup extends HTMLElement {
 
   close() {
     clearInterval(this._timer);
+    clearTimeout(this._closing);
     document.removeEventListener("keydown", this._key);
     this.remove();
     if (ListPopup.current === this) ListPopup.current = null;
@@ -70,6 +74,10 @@ class ListPopup extends HTMLElement {
     return Array.isArray(items) ? items.filter((i) => i && (i.name || i.entity_id)) : [];
   }
 
+  _keyOf(item) {
+    return String(item.key || item.entity_id || item.name);
+  }
+
   // The item's own `since` (a timestamp the helper chose), else when its entity last changed.
   _since(hass, item) {
     const st = item.entity_id && hass.states[item.entity_id];
@@ -85,27 +93,74 @@ class ListPopup extends HTMLElement {
     return `since<br>${esc(when)}`;
   }
 
+  // The row's action button. It disables once sent and comes back after a minute
+  // if the row is still listed (the helper drops the row when the action worked).
+  _actionButton(item, key, wide) {
+    const a = item.action;
+    if (!a || !a.action) return "";
+    const sent = this._sent[key] && Date.now() - this._sent[key] < 60000;
+    const col = colourOf(a.colour || "quiet");
+    const label = sent ? a.busy_label || "Sent…" : a.label || "Go";
+    const ic = a.icon ? `<ha-icon icon="${esc(a.icon)}"></ha-icon>` : "";
+    return `<button class="btn${wide ? " wide" : ""}" data-act="${esc(key)}" ${sent ? "disabled" : ""}
+      style="background:${esc(col.bg)};color:${esc(col.fg)}">${ic}<span>${esc(label)}</span></button>`;
+  }
+
+  _feed(hass, cam) {
+    const st = hass.states[cam];
+    const token = st && st.attributes.access_token;
+    if (!token) return `<div class="feed off">Camera unavailable</div>`;
+    // HA's own MJPEG proxy: works anywhere an <img> does, no extra card needed.
+    return `<div class="feed"><img src="/api/camera_proxy_stream/${esc(cam)}?token=${esc(token)}" alt=""><span class="live">LIVE</span></div>`;
+  }
+
+  _run(item, key) {
+    const hass = currentHass();
+    const a = item.action;
+    if (!hass || !a || !a.action) return;
+    const [domain, service] = String(a.action).split(".");
+    if (!domain || !service) return;
+    this._sent[key] = Date.now();
+    hass.callService(domain, service, a.data || {}, a.target || (item.entity_id ? { entity_id: item.entity_id } : undefined));
+    this._sig = null;
+    this._render();
+  }
+
   _render() {
     const hass = currentHass();
     if (!hass || !this.shadowRoot) return;
     const c = this._cfg;
     const items = this._items(hass);
+    const n = items.length;
+    // Close by itself once the last row has gone (e.g. the gate shut), unless told not to.
+    if (n) this._hadItems = true;
+    if (!n && this._hadItems && c.close_when_empty !== false && !this._closing) {
+      this._closing = setTimeout(() => this.close(), 1500);
+    }
+    if (this._expanded && !items.some((i) => this._keyOf(i) === this._expanded)) this._expanded = null;
     const colour = colourOf(c.colour);
     // `icon_colour` colours the icons themselves (as on a quiet status strip pill);
     // rows are tinted with it, else with the chip colour.
     const iconFg = c.icon_colour || colour.fg;
     const tint = c.icon_colour || colour.bg;
     const icon = c.icon || "mdi:format-list-bulleted";
-    const n = items.length;
     const count = c.noun ? `${n} ${esc(c.noun)}${n === 1 ? "" : "s"}` : `${n}`;
     const rows = items
       .map((i) => {
+        const key = this._keyOf(i);
         const st = i.entity_id && hass.states[i.entity_id];
         const ri = i.icon || (st && st.attributes.icon) || icon;
         const since = c.since === false ? "" : `<div class="since">${this._since(hass, i)}</div>`;
         const name = i.name || (st && st.attributes.friendly_name) || i.entity_id;
         const sec = i.secondary ? `<div class="sec">${esc(i.secondary)}</div>` : "";
-        return `<div class="row"><div class="icon"><ha-icon icon="${esc(ri)}"></ha-icon></div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}</div>`;
+        const open = i.camera && this._expanded === key;
+        // A row with a camera shows View; its action sits under the feed, so you look first.
+        const right = i.camera
+          ? `<button class="btn${open ? " on" : ""}" data-view="${esc(key)}"><ha-icon icon="${open ? "mdi:chevron-up" : "mdi:cctv"}"></ha-icon><span>${open ? "Hide" : "View"}</span></button>`
+          : this._actionButton(i, key, false);
+        const head = `<div class="row${open ? " open" : ""}"><div class="icon"><ha-icon icon="${esc(ri)}"></ha-icon></div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
+        if (!open) return head;
+        return `${head}<div class="expand">${this._feed(hass, i.camera)}${this._actionButton(i, key, true)}</div>`;
       })
       .join("");
     const link = c.link && c.link.path
@@ -124,9 +179,23 @@ class ListPopup extends HTMLElement {
       </div>`;
     if (html === this._sig) return;
     this._sig = html;
+    this._shown = items;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${html}`;
     this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());
     this.shadowRoot.querySelector(".close").addEventListener("click", () => this.close());
+    this.shadowRoot.querySelectorAll("[data-view]").forEach((b) =>
+      b.addEventListener("click", () => {
+        this._expanded = this._expanded === b.dataset.view ? null : b.dataset.view;
+        this._sig = null;
+        this._render();
+      })
+    );
+    this.shadowRoot.querySelectorAll("[data-act]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const item = (this._shown || []).find((i) => this._keyOf(i) === b.dataset.act);
+        if (item) this._run(item, b.dataset.act);
+      })
+    );
     const a = this.shadowRoot.querySelector(".link");
     if (a) {
       a.addEventListener("click", (ev) => {
@@ -174,6 +243,20 @@ ha-icon { display: flex; line-height: 0; }
 .name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sec { font-size: 13px; margin-top: 2px; color: var(--secondary-text-color, #a3a7b0); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .since { flex: none; font-size: 13px; text-align: right; color: var(--secondary-text-color, #a3a7b0); }
+.btn { flex: none; display: flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 12px;
+  border: none; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+  background: rgba(158, 158, 158, 0.25); color: var(--primary-text-color, #eaebee); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --mdc-icon-size: 18px; }
+.btn.on { background: rgba(158, 158, 158, 0.45); }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn.wide { width: 100%; height: 46px; margin-top: 10px; font-size: 15px; }
+.row.open { background: rgba(255, 255, 255, 0.05); border-radius: 14px 14px 0 0; margin-bottom: 0; }
+.expand { margin: 0 8px 6px; padding: 0 12px 12px; background: rgba(255, 255, 255, 0.05); border-radius: 0 0 14px 14px; }
+.feed { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; background: #111; }
+.feed img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.feed.off { display: flex; align-items: center; justify-content: center; color: var(--secondary-text-color, #a3a7b0); }
+.live { position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  padding: 2px 6px; border-radius: 6px; background: #db4437; color: #fff; }
 .empty { padding: 16px 20px; color: var(--secondary-text-color, #a3a7b0); }
 `;
 
