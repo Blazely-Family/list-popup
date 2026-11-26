@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -104,13 +104,16 @@ class ListPopup extends HTMLElement {
         return `<div class="row"><div class="icon"><ha-icon icon="${esc(ri)}"></ha-icon></div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}</div>`;
       })
       .join("");
+    const link = c.link && c.link.path
+      ? `<a class="link" href="${esc(c.link.path)}">${esc(c.link.label || "Show all")}</a>`
+      : "";
     const body = rows || `<div class="empty">${esc(c.empty || "Nothing to show")}</div>`;
     const html = `<div class="scrim"></div>
       <div class="dialog" role="dialog" aria-modal="true" style="--c:${esc(colour.bg)}">
         <div class="head">
           <div class="lead" style="background:${esc(colour.bg)};color:${esc(colour.fg)}"><ha-icon icon="${esc(icon)}"></ha-icon></div>
           <div class="title">${esc(c.title || "")}<span class="sub"> · ${count}</span></div>
-          <ha-icon class="close" icon="mdi:close"></ha-icon>
+          ${link}<ha-icon class="close" icon="mdi:close"></ha-icon>
         </div>
         <div class="divider"></div>
         <div class="list">${body}</div>
@@ -120,6 +123,16 @@ class ListPopup extends HTMLElement {
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${html}`;
     this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());
     this.shadowRoot.querySelector(".close").addEventListener("click", () => this.close());
+    const a = this.shadowRoot.querySelector(".link");
+    if (a) {
+      a.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        this.close();
+        // Navigate inside HA (same as a navigate action), not a page load.
+        history.pushState(null, "", this._cfg.link.path);
+        window.dispatchEvent(new CustomEvent("location-changed", { detail: { replace: false } }));
+      });
+    }
   }
 }
 
@@ -145,6 +158,8 @@ ha-icon { display: flex; line-height: 0; }
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); --mdc-icon-size: 18px; }
 .title { flex: 1 1 auto; font-size: 20px; font-weight: 500; }
 .sub { font-size: 13px; font-weight: 400; color: var(--secondary-text-color, #a3a7b0); }
+.link { flex: none; font-size: 14px; font-weight: 500; text-decoration: none; padding: 6px 10px; border-radius: 8px;
+  color: var(--primary-text-color, #eaebee); background: rgba(158, 158, 158, 0.25); }
 .close { cursor: pointer; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 22px; padding: 4px; }
 .divider { height: 1px; background: var(--divider-color, rgba(255, 255, 255, 0.08)); margin: 0 20px; }
 .list { overflow-y: auto; padding: 4px 0; }

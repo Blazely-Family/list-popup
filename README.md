@@ -33,6 +33,7 @@ tap_action:
 | `noun` | Adds a count to the header, e.g. `device` gives "1 device", "3 devices". Without it the header shows the bare count. |
 | `since` | `false` hides the time column. |
 | `empty` | Text when the list is empty. Default "Nothing to show". |
+| `link` | Optional header button that closes the pop-up and goes to a dashboard path: `{ path: /dashboard/view, label: Show all }`. `label` defaults to "Show all". |
 
 The list follows the helper while the pop-up is open. Escape, the close
 button or a tap outside closes it.
