@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.6.1";
+const VERSION = "0.7.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -80,7 +80,8 @@ class ListPopup extends HTMLElement {
   // The item's own `since` (a timestamp the helper chose), else when its entity last changed.
   _since(hass, item) {
     const st = item.entity_id && hass.states[item.entity_id];
-    const ts = item.since || (st && st.last_changed);
+    // An item that carries `since` (even null, for "no meaningful time") overrides the entity.
+    const ts = "since" in item ? item.since : st && st.last_changed;
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
@@ -94,13 +95,18 @@ class ListPopup extends HTMLElement {
 
   // The row's action button. It disables once sent and comes back after a minute
   // if the row is still listed (the helper drops the row when the action worked).
+  // The helper says what to do (`action: { service, target }`); how its button
+  // looks comes from the pop-up's `actions` config, keyed by service.
   _actionButton(item, key, wide) {
     const a = item.action;
-    if (!a || !a.action) return "";
+    const service = a && (a.service || a.action);
+    if (!service) return "";
+    const look = { ...((this._cfg.actions || {})[service] || {}), ...a };
     const sent = this._sent[key] && Date.now() - this._sent[key] < 60000;
-    const col = colourOf(a.colour || "quiet");
-    const label = sent ? a.busy_label || "Sent…" : a.label || "Go";
-    const ic = a.icon ? `<ha-icon icon="${esc(a.icon)}"></ha-icon>` : "";
+    const col = colourOf(look.colour || "quiet");
+    const fill = (t) => String(t).replace(/\{name\}/g, item.name || "");
+    const label = fill(sent ? look.busy_label || "Sent…" : look.label || "Go");
+    const ic = look.icon ? `<ha-icon icon="${esc(look.icon)}"></ha-icon>` : "";
     return `<button class="btn${wide ? " wide" : ""}" data-act="${esc(key)}" ${sent ? "disabled" : ""}
       style="background:${esc(col.bg)};color:${esc(col.fg)}">${ic}<span>${esc(label)}</span></button>`;
   }
@@ -152,6 +158,27 @@ class ListPopup extends HTMLElement {
     });
   }
 
+  // The line under the name, built from the item's fields by the pop-up's
+  // `secondary` config: a list of parts joined with " · ". A part is a field
+  // name, or { field, unit?, prefix?, text?, map? }: `text` shows when the field
+  // is true; `map` translates values; otherwise prefix + value + unit. A list
+  // value is joined with ", ". Without `secondary`, the item's own `secondary`.
+  _secondary(item) {
+    const spec = this._cfg.secondary;
+    if (!Array.isArray(spec)) return item.secondary || "";
+    const parts = spec.map((p) => {
+      const part = typeof p === "string" ? { field: p } : p || {};
+      let v = item[part.field];
+      if (v === undefined || v === null || v === "" || v === false) return "";
+      if (Array.isArray(v)) v = v.filter((x) => x !== null && x !== "").join(", ");
+      if (part.text !== undefined) return v ? part.text : "";
+      if (part.map) v = part.map[v] ?? v;
+      if (v === "") return "";
+      return `${part.prefix ?? ""}${v}${part.unit ?? ""}`;
+    });
+    return parts.filter(Boolean).join(" · ");
+  }
+
   // Without a `camera_card`, a plain HA MJPEG proxy image.
   _feed(hass, cam) {
     if (this._cfg.camera_card) return "";
@@ -161,11 +188,20 @@ class ListPopup extends HTMLElement {
     return `<div class="feed"><img src="/api/camera_proxy_stream/${esc(cam)}?token=${esc(token)}" alt=""></div>`;
   }
 
+  // HA state icons need their entity handed over as properties after each draw.
+  _stateIcons(hass) {
+    this.shadowRoot.querySelectorAll("ha-state-icon[data-entity]").forEach((el) => {
+      el.hass = hass;
+      el.stateObj = hass.states[el.dataset.entity];
+    });
+  }
+
   _run(item, key) {
     const hass = currentHass();
     const a = item.action;
-    if (!hass || !a || !a.action) return;
-    const [domain, service] = String(a.action).split(".");
+    const svc = a && (a.service || a.action);
+    if (!hass || !svc) return;
+    const [domain, service] = String(svc).split(".");
     if (!domain || !service) return;
     this._sent[key] = Date.now();
     hass.callService(domain, service, a.data || {}, a.target || (item.entity_id ? { entity_id: item.entity_id } : undefined));
@@ -197,10 +233,18 @@ class ListPopup extends HTMLElement {
       .map((i) => {
         const key = this._keyOf(i);
         const st = i.entity_id && hass.states[i.entity_id];
-        const ri = i.icon || (st && st.attributes.icon) || icon;
+        // Row icon: the item's own override, else HA's own icon for its entity
+        // (`icon_entity`, else `entity_id`), as a tile would show it.
+        const iconEntity = i.icon_entity || i.entity_id;
+        const rowIcon = i.icon
+          ? `<ha-icon icon="${esc(i.icon)}"></ha-icon>`
+          : iconEntity && hass.states[iconEntity]
+            ? `<ha-state-icon data-entity="${esc(iconEntity)}"></ha-state-icon>`
+            : `<ha-icon icon="${esc(icon)}"></ha-icon>`;
         const since = c.since === false ? "" : `<div class="since">${this._since(hass, i)}</div>`;
         const name = i.name || (st && st.attributes.friendly_name) || i.entity_id;
-        const sec = i.secondary ? `<div class="sec">${esc(i.secondary)}</div>` : "";
+        const secText = this._secondary(i);
+        const sec = secText ? `<div class="sec">${esc(secText)}</div>` : "";
         // `cameras` (or one `camera`): shown side by side when the row is expanded.
         const cams = this._camList(i);
         const open = cams.length > 0 && this._expanded === key;
@@ -208,7 +252,7 @@ class ListPopup extends HTMLElement {
         const right = cams.length
           ? `<ha-icon class="chev" data-view="${esc(key)}" icon="${open ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`
           : this._actionButton(i, key, false);
-        const head = `<div class="row${open ? " open" : ""}"><div class="icon"><ha-icon icon="${esc(ri)}"></ha-icon></div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
+        const head = `<div class="row${open ? " open" : ""}"><div class="icon">${rowIcon}</div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
         const feeds = cams.map((cam) => this._feed(hass, cam.entity)).join("");
         return `${head}<div class="expand"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}</div>${this._actionButton(i, key, true)}</div>`;
@@ -234,10 +278,14 @@ class ListPopup extends HTMLElement {
       this._cards = null;
     }
     if (this._cards) this._cards.then((els) => els.forEach((el) => (el.hass = hass)));
-    if (html === this._sig) return;
+    if (html === this._sig) {
+      this._stateIcons(hass);
+      return;
+    }
     this._sig = html;
     this._shown = items;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${html}`;
+    this._stateIcons(hass);
     const openItem = this._expanded && items.find((i) => this._keyOf(i) === this._expanded);
     if (openItem) this._placeCards(hass, openItem, this._expanded);
     this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());

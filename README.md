@@ -35,6 +35,8 @@ tap_action:
 | `since` | `false` hides the time column. |
 | `empty` | Text when the list is empty. Default "Nothing to show". |
 | `link` | Optional header button that closes the pop-up and goes to a dashboard path: `{ path: /dashboard/view, label: Show all }`. `label` defaults to "Show all". |
+| `secondary` | How the line under each name is built from the item's fields: a list of parts joined with " · ". A part is a field name, or `{ field, unit?, prefix?, text?, map? }`: `text` is shown when the field is true, `map` translates values, otherwise prefix + value + unit. List values are joined with ", ". |
+| `actions` | Button look per service: `{ "cover.close_cover": { label: "Close {name}", icon, colour, busy_label: "Closing…" } }`. `{name}` is the row's name. |
 | `camera_card` | Card config used for each camera of an expanded row, so the feeds look like your dashboard's own camera cards. Every `$camera` and `$title` string in it is replaced with the camera entity and its title. Without it, a plain HA camera image is shown. |
 
 ```yaml
@@ -57,11 +59,13 @@ The attribute is a list (or a JSON string of one) of:
 | Key | Meaning |
 | --- | --- |
 | `name` | Row title. Falls back to `entity_id`'s friendly name. |
-| `secondary` | The line under the name. |
-| `icon` | Row icon. Falls back to `entity_id`'s icon, then the header icon. |
-| `since` | A timestamp shown as "since 11:00 pm" (today) or "since 25 Nov". Falls back to when `entity_id` last changed. |
+| any other field | Plain facts (`area`, `level`, `low`, …) that the pop-up's `secondary` setting turns into the line under the name. |
+| `secondary` | A ready-made line, used only when the pop-up has no `secondary` setting. |
+| `icon` | Optional icon override. By default the row shows HA's own icon for `icon_entity` (else `entity_id`), exactly as a tile would. |
+| `icon_entity` | Optional entity whose HA icon the row shows (e.g. a gate's cover rather than its position sensor). |
+| `since` | A timestamp shown as "since 11:00 pm" (today) or "since 25 Nov". Falls back to when `entity_id` last changed; `null` shows no time. |
 | `entity_id` | Optional; used for the fallbacks above and as the default action target. |
-| `action` | Optional row button: `{ label, icon?, action: domain.service, target?, data?, colour?, busy_label? }`. Tapping calls the service (target defaults to `entity_id`), then the button shows `busy_label` (default "Sent…") disabled. It comes back after a minute if the row is still listed; normally the helper drops the row once the action has worked. |
+| `action` | Optional row button: `{ service: domain.service, target?, data? }`, i.e. what to do. How it looks comes from the pop-up's `actions` setting. Tapping calls the service, then the button shows its busy label, disabled. It comes back after a minute if the row is still listed; normally the helper drops the row once the action has worked. |
 | `camera` / `cameras` | Optional camera entity, or a list of entities or `{ entity, title }`. The row then shows a chevron that expands the feeds (one `camera_card` each, two side by side) with the `action` button under them, so you look before acting. Only one row is expanded at a time. |
 | `key` | Optional stable id for the row (default `entity_id`, then `name`). |
 
@@ -77,12 +81,15 @@ template:
       - name: Example offline devices
         variables:
           devices: >-
-            {{ [{'name': 'Printer', 'secondary': 'Workshop · Door',
-                 'icon': 'mdi:printer-3d', 'since': now().isoformat()}] }}
+            {{ [{'name': 'Printer', 'area': 'Workshop', 'sensors': ['Door'],
+                 'entity_id': 'binary_sensor.printer_door'}] }}
         state: "{{ devices | count }}"
         attributes:
           devices: "{{ devices }}"
 ```
+
+with `secondary: [area, sensors]` in the pop-up config, the row reads
+"Printer" over "Workshop · Door", with the door sensor's own HA icon.
 
 ## Styling
 
