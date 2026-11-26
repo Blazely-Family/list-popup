@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.6.0";
+const VERSION = "0.6.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -204,9 +204,9 @@ class ListPopup extends HTMLElement {
         // `cameras` (or one `camera`): shown side by side when the row is expanded.
         const cams = this._camList(i);
         const open = cams.length > 0 && this._expanded === key;
-        // A row with a camera shows View; its action sits under the feed, so you look first.
+        // A row with a camera expands (chevron); its action sits under the feed, so you look first.
         const right = cams.length
-          ? `<button class="btn${open ? " on" : ""}" data-view="${esc(key)}"><ha-icon icon="${open ? "mdi:chevron-up" : "mdi:cctv"}"></ha-icon><span>${open ? "Hide" : "View"}</span></button>`
+          ? `<ha-icon class="chev" data-view="${esc(key)}" icon="${open ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`
           : this._actionButton(i, key, false);
         const head = `<div class="row${open ? " open" : ""}"><div class="icon"><ha-icon icon="${esc(ri)}"></ha-icon></div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
@@ -317,6 +317,7 @@ ha-icon { display: flex; line-height: 0; }
 .feeds { display: grid; grid-template-columns: 1fr; gap: 8px; }
 .feeds.two { grid-template-columns: 1fr 1fr; }
 .feeds > * { display: block; min-width: 0; }
+.chev { flex: none; cursor: pointer; padding: 4px; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 24px; }
 .empty { padding: 16px 20px; color: var(--secondary-text-color, #a3a7b0); }
 `;
 
