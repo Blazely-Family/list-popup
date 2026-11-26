@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.5.0";
+const VERSION = "0.5.1";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -54,7 +54,6 @@ class ListPopup extends HTMLElement {
 
   close() {
     clearInterval(this._timer);
-    clearTimeout(this._closing);
     document.removeEventListener("keydown", this._key);
     this.remove();
     if (ListPopup.current === this) ListPopup.current = null;
@@ -135,8 +134,9 @@ class ListPopup extends HTMLElement {
     const n = items.length;
     // Close by itself once the last row has gone (e.g. the gate shut), unless told not to.
     if (n) this._hadItems = true;
-    if (!n && this._hadItems && c.close_when_empty !== false && !this._closing) {
-      this._closing = setTimeout(() => this.close(), 1500);
+    if (!n && this._hadItems && c.close_when_empty !== false) {
+      this.close();
+      return;
     }
     if (this._expanded && !items.some((i) => this._keyOf(i) === this._expanded)) this._expanded = null;
     const colour = colourOf(c.colour);

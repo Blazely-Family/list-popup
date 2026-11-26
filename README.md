@@ -55,7 +55,7 @@ The attribute is a list (or a JSON string of one) of:
 | `key` | Optional stable id for the row (default `entity_id`, then `name`). |
 
 When the last row disappears while the pop-up is open (for example the gate
-it was showing has shut), the pop-up closes itself after a moment. Set
+it was showing has shut), the pop-up closes itself straight away. Set
 `close_when_empty: false` in the pop-up config to keep it open.
 
 A template sensor can build it, for example:
