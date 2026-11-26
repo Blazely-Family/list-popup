@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.15.1";
+const VERSION = "0.16.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -263,7 +263,7 @@ class ListPopup extends HTMLElement {
   // frame and everything below the row moves with it.
   _slide(el, opening, done) {
     const dlg = this.shadowRoot.querySelector(".dialog");
-    this._sliding = true;
+    this._sliding = (this._sliding || 0) + 1;
     if (dlg) dlg.style.transition = "none";
     const full = el.scrollHeight;
     Object.assign(el.style, { boxSizing: "border-box", overflow: "hidden", transition: "none",
@@ -275,8 +275,8 @@ class ListPopup extends HTMLElement {
     const end = () => {
       if (ended) return;
       ended = true;
-      this._sliding = false;
-      if (dlg) dlg.style.transition = "";
+      this._sliding = Math.max(0, this._sliding - 1);
+      if (dlg && !this._sliding) dlg.style.transition = "";
       if (done) return done();
       Object.assign(el.style, { boxSizing: "", overflow: "", transition: "", height: "", paddingBottom: "", opacity: "" });
     };
@@ -427,6 +427,14 @@ class ListPopup extends HTMLElement {
     // `groups`: sections in the given order, each a value of the items' `group`
     // field with a title and colour: [{ value, title, colour }]. Items in no
     // listed group come last, untitled.
+    // Each row (and each section title) sits in its own .item, so it can slide
+    // in and out as the list changes.
+    const keys = [];
+    const wrap = (k, inner) => {
+      keys.push(k);
+      return `<div class="item" data-key="${esc(k)}">${inner}</div>`;
+    };
+    const itemOf = (i, groupColour) => wrap(this._keyOf(i), rowOf(i, groupColour));
     let rows;
     if (Array.isArray(c.groups) && c.groups.length) {
       const field = c.group_field || "group";
@@ -436,13 +444,13 @@ class ListPopup extends HTMLElement {
         .filter((s) => s.rows.length)
         .map(({ g, rows: r }) => {
           const col = g.colour ? ` style="color:${esc(g.colour)}"` : "";
-          const title = g.title ? `<div class="group"${col}>${esc(g.title)}</div>` : "";
-          return title + r.map((i) => rowOf(i, g.colour)).join("");
+          const title = g.title ? wrap(`group:${g.value}`, `<div class="group"${col}>${esc(g.title)}</div>`) : "";
+          return title + r.map((i) => itemOf(i, g.colour)).join("");
         });
-      const rest = items.filter((i) => !listed.includes(i[field])).map((i) => rowOf(i)).join("");
+      const rest = items.filter((i) => !listed.includes(i[field])).map((i) => itemOf(i)).join("");
       rows = sections.join("") + rest;
     } else {
-      rows = items.map((i) => rowOf(i)).join("");
+      rows = items.map((i) => itemOf(i)).join("");
     }
     const link = c.link && c.link.path
       ? `<a class="link" href="${esc(c.link.path)}">${esc(c.link.label || "Show all")}</a>`
@@ -465,6 +473,23 @@ class ListPopup extends HTMLElement {
       this._stateIcons(hass);
       return;
     }
+    // Rows that have left the list slide shut first, so the rows below move up
+    // and the panel shrinks with them; then the list is redrawn.
+    if (this._removing) return;
+    const prev = [...this.shadowRoot.querySelectorAll(".item[data-key]")];
+    const gone = prev.filter((el) => !keys.includes(el.dataset.key));
+    if (gone.length && keys.length) {
+      this._removing = true;
+      let left = gone.length;
+      gone.forEach((el) => this._slide(el, false, () => {
+        if (--left) return;
+        this._removing = false;
+        this._sig = null;
+        this._render();
+      }));
+      return;
+    }
+    const before = prev.length ? new Set(prev.map((el) => el.dataset.key)) : null;
     this._sig = html;
     this._shown = items;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>${html}`;
@@ -476,6 +501,10 @@ class ListPopup extends HTMLElement {
     const growing = this._grow && this.shadowRoot.querySelector(".expand.grow");
     this._grow = null;
     if (growing) this._slide(growing, true);
+    // Rows new to the list slide open, pushing the rows below down.
+    if (before) this.shadowRoot.querySelectorAll(".item[data-key]").forEach((el) => {
+      if (!before.has(el.dataset.key)) this._slide(el, true);
+    });
     this.shadowRoot.querySelector(".scrim").addEventListener("click", () => this.close());
     this.shadowRoot.querySelector(".close").addEventListener("click", () => this.close());
     // The whole row (not just its chevron) opens and closes its cameras.
@@ -544,8 +573,9 @@ ha-icon { display: flex; line-height: 0; }
 /* No visible scrollbar: one appearing while the panel grows would shift the rows left. */
 .list::-webkit-scrollbar { display: none; }
 .head, .divider { flex: none; }
-.rows { display: flow-root; }
-.row { display: flex; align-items: center; gap: 14px; padding: 12px; margin: 6px 8px; border-radius: 14px; }
+.rows { display: flow-root; padding: 3px 0; }
+.item { display: flow-root; }
+.row { display: flex; align-items: center; gap: 14px; padding: 12px; margin: 3px 8px; border-radius: 14px; }
 .icon { flex: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px;
   background: color-mix(in srgb, var(--c) 30%, transparent); color: color-mix(in srgb, var(--c) 88%, white); --mdc-icon-size: 22px; }
 .txt { flex: 1 1 auto; min-width: 0; }
@@ -561,7 +591,7 @@ ha-icon { display: flex; line-height: 0; }
 .btn.wide { width: 100%; height: 46px; margin-top: 10px; font-size: 15px; }
 .row.open { background: rgba(255, 255, 255, 0.05); border-radius: 14px 14px 0 0; margin-bottom: 0; }
 .row.tap { cursor: pointer; }
-.expand { margin: 0 8px 6px; padding: 0 12px 12px; background: rgba(255, 255, 255, 0.05); border-radius: 0 0 14px 14px; }
+.expand { margin: 0 8px 3px; padding: 0 12px 12px; background: rgba(255, 255, 255, 0.05); border-radius: 0 0 14px 14px; }
 .feed { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; background: #111; }
 .feed img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .feed.off { display: flex; align-items: center; justify-content: center; color: var(--secondary-text-color, #a3a7b0); }
