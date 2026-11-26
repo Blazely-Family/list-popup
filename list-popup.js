@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.16.1";
+const VERSION = "0.16.2";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -482,6 +482,7 @@ class ListPopup extends HTMLElement {
       this._removing = true;
       let left = gone.length;
       gone.forEach((el) => this._slide(el, false, () => {
+        el.remove(); // gone for good, so the redraw doesn't see it as leaving again
         if (--left) return;
         this._removing = false;
         this._sig = null;
