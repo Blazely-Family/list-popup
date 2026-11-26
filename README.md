@@ -57,7 +57,7 @@ camera_card:
 If the tapped element (or one around it) has a `data-popup-anchor` attribute (its value names the anchor, so the
 pop-up finds it again after its card redraws),
 the pop-up hangs just below it, its left edge on the anchor's left edge (or as far right as
-fits on screen, and above it if there's more room there), and the anchor stays lit
+fits inside the card the anchor is in, else on screen, and above it if there's more room there), and the anchor stays lit
 through the dimmed backdrop. Status Strip Card pills are anchors. Without one,
 the pop-up is centred.
 

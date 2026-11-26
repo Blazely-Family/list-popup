@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.17.3";
+const VERSION = "0.17.4";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -310,8 +310,15 @@ class ListPopup extends HTMLElement {
     const vw = window.innerWidth, vh = window.innerHeight, gap = 8, edge = 16;
     const w = Math.min(560, vw - 2 * edge);
     // The panel's left edge lines up with the anchor's, unless that would run
-    // it off the right of the screen: then it sits as far right as fits.
-    const left = Math.max(Math.min(r.left, vw - edge - w), edge);
+    // it past the right of the card the anchor lives in (e.g. the status strip,
+    // which keeps it clear of a nav bar): then it sits as far right as fits.
+    // The screen is the limit when there's no such card or it's too narrow.
+    const host = this._anchorRoot && this._anchorRoot.host;
+    const box = host && host.getBoundingClientRect();
+    const fits = box && box.width >= w;
+    const lo = fits ? Math.max(box.left, edge) : edge;
+    const hi = fits ? Math.min(box.right, vw - edge) - w : vw - edge - w;
+    const left = Math.max(Math.min(r.left, hi), lo);
     const below = vh - r.bottom - gap - edge, above = r.top - gap - edge;
     const down = below >= 320 || below >= above;
     this._maxH = Math.max(120, down ? below : above);
