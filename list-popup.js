@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.7.5";
+const VERSION = "0.8.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -46,6 +46,9 @@ class ListPopup extends HTMLElement {
       if (ev.key === "Escape") this.close();
     };
     document.addEventListener("keydown", this._key);
+    // Any navigation (e.g. tapping a camera to open its page) closes the pop-up.
+    this._nav = () => this.close();
+    window.addEventListener("location-changed", this._nav);
     // Mount inside Home Assistant itself (where its own dialogs live), not on
     // <body>: cards such as camera players look up HA context from their
     // ancestors, and outside the app they fall back to slow snapshots.
@@ -60,6 +63,7 @@ class ListPopup extends HTMLElement {
     clearInterval(this._timer);
     this._dropCards();
     document.removeEventListener("keydown", this._key);
+    window.removeEventListener("location-changed", this._nav);
     this.remove();
     if (ListPopup.current === this) ListPopup.current = null;
   }
@@ -117,12 +121,16 @@ class ListPopup extends HTMLElement {
   }
 
   // The camera card for one camera: the pop-up's `camera_card` config with every
-  // "$camera" / "$title" string replaced, built by HA's own card helpers, so it
+  // "$camera" / "$title" / "$page" string replaced ($page: the camera's own
+  // dashboard page, from the pop-up's `camera_pages` map), built by HA's own card helpers, so it
   // looks and behaves exactly like that card does elsewhere on the dashboard.
   async _cameraCard(cam, title) {
     const fill = (v) =>
       typeof v === "string"
-        ? v.replace(/\$camera/g, cam).replace(/\$title/g, title)
+        ? v
+            .replace(/\$camera/g, cam)
+            .replace(/\$title/g, title)
+            .replace(/\$page/g, (this._cfg.camera_pages || {})[cam] || "")
         : Array.isArray(v)
           ? v.map(fill)
           : v && typeof v === "object"

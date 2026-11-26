@@ -37,7 +37,8 @@ tap_action:
 | `link` | Optional header button that closes the pop-up and goes to a dashboard path: `{ path: /dashboard/view, label: Show all }`. `label` defaults to "Show all". |
 | `secondary` | How the line under each name is built from the item's fields: a list of parts joined with " · ". A part is a field name, or `{ field, unit?, prefix?, text?, map?, duration?, round? }`: `text` is shown when the field is true, `map` translates values, `duration: true` shows seconds as "14m", `round` sets decimal places, otherwise prefix + value + unit. List values are joined with ", ". |
 | `actions` | Button look per service: `{ "cover.close_cover": { label: "Close {name}", icon, colour, busy_label: "Closing…" } }`. `{name}` is the row's name. |
-| `camera_card` | Card config used for each camera of an expanded row, so the feeds look like your dashboard's own camera cards. Every `$camera` and `$title` string in it is replaced with the camera entity and its title. Without it, a plain HA camera image is shown. |
+| `camera_card` | Card config used for each camera of an expanded row, so the feeds look like your dashboard's own camera cards. Every `$camera`, `$title` and `$page` string in it is replaced with the camera entity, its title and its page from `camera_pages`. Without it, a plain HA camera image is shown. |
+| `camera_pages` | Each camera's own dashboard page, e.g. `{ camera.front_gate: /home-panel/sub-front-gate }`, used as `$page` (a tap action `navigate` to `$page` opens it). Any navigation closes the pop-up. |
 
 ```yaml
 camera_card:
