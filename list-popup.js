@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.9.0";
+const VERSION = "0.10.0";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -289,9 +289,10 @@ class ListPopup extends HTMLElement {
     const tint = c.icon_colour || colour.bg;
     const icon = c.icon || "mdi:format-list-bulleted";
     const count = c.noun ? `${n} ${esc(c.noun)}${n === 1 ? "" : "s"}` : `${n}`;
-    const rows = items
-      .map((i) => {
+    const rowOf = (i, groupColour) => {
         const key = this._keyOf(i);
+        // A row in a coloured section takes that colour for its icon tint.
+        const tintStyle = groupColour ? ` style="--c:${esc(groupColour)}"` : "";
         const st = i.entity_id && hass.states[i.entity_id];
         // Row icon: the item's own override, else HA's own icon for its entity
         // (`icon_entity`, else `entity_id`), as a tile would show it.
@@ -312,13 +313,32 @@ class ListPopup extends HTMLElement {
         const right = cams.length
           ? `<ha-icon class="chev" icon="${open ? "mdi:chevron-up" : "mdi:chevron-down"}"></ha-icon>`
           : this._actionButton(i, key, false);
-        const head = `<div class="row${open ? " open" : ""}${cams.length ? " tap" : ""}"${cams.length ? ` data-view="${esc(key)}"` : ""}><div class="icon">${rowIcon}</div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
+        const head = `<div class="row${open ? " open" : ""}${cams.length ? " tap" : ""}"${cams.length ? ` data-view="${esc(key)}"` : ""}${tintStyle}><div class="icon">${rowIcon}</div><div class="txt"><div class="name">${esc(name)}</div>${sec}</div>${since}${right}</div>`;
         if (!open) return head;
         const feeds = cams.map((cam) => this._feed(hass, cam.entity)).join("");
         const grow = this._grow === key ? " grow" : "";
         return `${head}<div class="expand${grow}"><div class="feeds${cams.length > 1 ? " two" : ""}">${feeds}${c.camera_card ? cams.map((_, n) => `<div class="cell"><slot name="feed-${n}"></slot></div>`).join("") : ""}</div>${this._actionButton(i, key, true)}</div>`;
-      })
-      .join("");
+    };
+    // `groups`: sections in the given order, each a value of the items' `group`
+    // field with a title and colour: [{ value, title, colour }]. Items in no
+    // listed group come last, untitled.
+    let rows;
+    if (Array.isArray(c.groups) && c.groups.length) {
+      const field = c.group_field || "group";
+      const listed = c.groups.map((g) => g.value);
+      const sections = c.groups
+        .map((g) => ({ g, rows: items.filter((i) => i[field] === g.value) }))
+        .filter((s) => s.rows.length)
+        .map(({ g, rows: r }) => {
+          const col = g.colour ? ` style="color:${esc(g.colour)}"` : "";
+          const title = g.title ? `<div class="group"${col}>${esc(g.title)}</div>` : "";
+          return title + r.map((i) => rowOf(i, g.colour)).join("");
+        });
+      const rest = items.filter((i) => !listed.includes(i[field])).map((i) => rowOf(i)).join("");
+      rows = sections.join("") + rest;
+    } else {
+      rows = items.map((i) => rowOf(i)).join("");
+    }
     const link = c.link && c.link.path
       ? `<a class="link" href="${esc(c.link.path)}">${esc(c.link.label || "Show all")}</a>`
       : "";
@@ -432,6 +452,7 @@ ha-icon { display: flex; line-height: 0; }
 .feeds > *, ::slotted(*) { display: block; min-width: 0; }
 .cell { min-width: 0; }
 .chev { flex: none; cursor: pointer; padding: 4px; color: var(--secondary-text-color, #a3a7b0); --mdc-icon-size: 24px; }
+.group { padding: 10px 20px 2px; font-size: 12px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; color: var(--secondary-text-color, #a3a7b0); }
 .empty { padding: 16px 20px; color: var(--secondary-text-color, #a3a7b0); }
 `;
 
