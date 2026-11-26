@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.7.3";
+const VERSION = "0.7.4";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -183,7 +183,7 @@ class ListPopup extends HTMLElement {
 
   // The line under the name, built from the item's fields by the pop-up's
   // `secondary` config: a list of parts joined with " · ". A part is a field
-  // name, or { field, unit?, prefix?, text?, map? }: `text` shows when the field
+  // name, or { field, unit?, prefix?, text?, map?, duration? }: `text` shows when the field
   // is true; `map` translates values; otherwise prefix + value + unit. A list
   // value is joined with ", ". Without `secondary`, the item's own `secondary`.
   _secondary(item) {
@@ -196,6 +196,11 @@ class ListPopup extends HTMLElement {
       if (Array.isArray(v)) v = v.filter((x) => x !== null && x !== "").join(", ");
       if (part.text !== undefined) return v ? part.text : "";
       if (part.map) v = part.map[v] ?? v;
+      // `duration`: seconds shown as "14m" / "1h 5m", like the status strip timers.
+      if (part.duration && !Number.isNaN(Number(v))) {
+        const m = Math.max(0, Math.floor(Number(v) / 60));
+        v = m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+      }
       if (v === "") return "";
       return `${part.prefix ?? ""}${v}${part.unit ?? ""}`;
     });

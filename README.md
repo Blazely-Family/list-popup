@@ -35,7 +35,7 @@ tap_action:
 | `since` | `false` hides the time column. |
 | `empty` | Text when the list is empty. Default "Nothing to show". |
 | `link` | Optional header button that closes the pop-up and goes to a dashboard path: `{ path: /dashboard/view, label: Show all }`. `label` defaults to "Show all". |
-| `secondary` | How the line under each name is built from the item's fields: a list of parts joined with " · ". A part is a field name, or `{ field, unit?, prefix?, text?, map? }`: `text` is shown when the field is true, `map` translates values, otherwise prefix + value + unit. List values are joined with ", ". |
+| `secondary` | How the line under each name is built from the item's fields: a list of parts joined with " · ". A part is a field name, or `{ field, unit?, prefix?, text?, map?, duration? }`: `text` is shown when the field is true, `map` translates values, `duration: true` shows seconds as "14m", otherwise prefix + value + unit. List values are joined with ", ". |
 | `actions` | Button look per service: `{ "cover.close_cover": { label: "Close {name}", icon, colour, busy_label: "Closing…" } }`. `{name}` is the row's name. |
 | `camera_card` | Card config used for each camera of an expanded row, so the feeds look like your dashboard's own camera cards. Every `$camera` and `$title` string in it is replaced with the camera entity and its title. Without it, a plain HA camera image is shown. |
 
