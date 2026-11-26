@@ -8,7 +8,7 @@
  * See README.md for the config reference.
  */
 
-const VERSION = "0.11.1";
+const VERSION = "0.11.2";
 
 // Named colours match status-strip-card's pill colours; any CSS colour works too.
 const COLOURS = {
@@ -114,11 +114,19 @@ class ListPopup extends HTMLElement {
     const look = { ...((this._cfg.actions || {})[service] || {}), ...a };
     const sentAt = this._sent[`${key}|${service}`];
     const sent = sentAt && Date.now() - sentAt < 60000;
+    // `disabled_by: { field, labels }`: greyed out while the item's field is set
+    // (e.g. `moving`), labelled by its value ("Opening…" / "Closing…").
+    const by = look.disabled_by;
+    const busyValue = by && item[by.field];
     const col = colourOf(look.colour || "quiet");
     const fill = (t) => String(t).replace(/\{name\}/g, item.name || "");
-    const label = fill(sent ? look.busy_label || "Sent…" : look.label || "Go");
+    const label = fill(
+      busyValue
+        ? (by.labels && by.labels[busyValue]) || String(busyValue)
+        : sent ? look.busy_label || "Sent…" : look.label || "Go"
+    );
     const ic = look.icon ? `<ha-icon icon="${esc(look.icon)}"></ha-icon>` : "";
-    return `<button class="btn${wide ? " wide" : ""}" data-act="${esc(key)}" ${sent ? "disabled" : ""}
+    return `<button class="btn${wide ? " wide" : ""}" data-act="${esc(key)}" ${sent || busyValue ? "disabled" : ""}
       style="background:${esc(col.bg)};color:${esc(col.fg)}">${ic}<span>${esc(label)}</span></button>`;
   }
 
